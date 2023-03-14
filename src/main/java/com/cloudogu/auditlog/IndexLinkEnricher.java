@@ -22,28 +22,36 @@
  * SOFTWARE.
  */
 
-plugins {
-  id 'org.scm-manager.smp' version '0.15.0'
-}
+package com.cloudogu.auditlog;
 
-dependencies {
-  // define dependencies to other plugins here e.g.:
-  // plugin "sonia.scm.plugins:scm-mail-plugin:2.1.0"
-  // optionalPlugin "sonia.scm.plugins:scm-editor-plugin:2.0.0"
-  implementation 'com.h2database:h2:2.1.214'
-  implementation 'org.javers:javers-core:6.7.1'
-}
+import com.google.inject.Provider;
+import sonia.scm.api.v2.resources.Enrich;
+import sonia.scm.api.v2.resources.HalAppender;
+import sonia.scm.api.v2.resources.HalEnricher;
+import sonia.scm.api.v2.resources.HalEnricherContext;
+import sonia.scm.api.v2.resources.Index;
+import sonia.scm.api.v2.resources.LinkBuilder;
+import sonia.scm.api.v2.resources.ScmPathInfoStore;
+import sonia.scm.plugin.Extension;
 
-scmPlugin {
-  scmVersion = "2.42.4-SNAPSHOT"
-  displayName = "Audit Log"
-  description = "Logs various actions on your server"
-  author = "Cloudogu GmbH"
-  category = "Administration"
+import javax.inject.Inject;
 
-  openapi {
-    packages = [
-      "com.cloudogu.auditlog"
-    ]
+@Enrich(Index.class)
+@Extension
+public class IndexLinkEnricher implements HalEnricher {
+
+  private final Provider<ScmPathInfoStore> pathInfoStore;
+
+  @Inject
+  public IndexLinkEnricher(Provider<ScmPathInfoStore> pathInfoStore) {
+    this.pathInfoStore = pathInfoStore;
+  }
+
+  @Override
+  public void enrich(HalEnricherContext context, HalAppender appender) {
+    if (PermissionChecker.mayReadAuditLog()) {
+      LinkBuilder linkBuilder = new LinkBuilder(pathInfoStore.get().get(), AuditLogResource.class);
+      appender.appendLink("auditLog", linkBuilder.method("getPaginatedAuditLog").parameters().href());
+    }
   }
 }

@@ -1,5 +1,14 @@
 {
   "scm-audit-log-plugin": {
-
+    "title": "Audit Log",
+    "navLink": "Audit Log"
+  },
+  "permissions": {
+    "auditLog": {
+      "read": {
+        "displayName": "Audit Log lesen",
+        "description": "Darf das Audit Log lesen"
+      }
+    }
   }
 }

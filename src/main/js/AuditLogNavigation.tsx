@@ -21,21 +21,30 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+import React, { FC } from "react";
+import { SecondaryNavigationItem } from "@scm-manager/ui-components";
+import { useTranslation } from "react-i18next";
+import { useRouteMatch } from "react-router-dom";
 
-package com.cloudogu.auditlog;
+const AuditLogNavigation: FC = () => {
+  const [t] = useTranslation("plugins");
+  const match = useRouteMatch();
 
-import javax.ws.rs.GET;
-import javax.ws.rs.Path;
-import javax.ws.rs.Produces;
-import javax.ws.rs.core.MediaType;
+  const matchesAuditLog = (route: any) => {
+    const regex = /\/admin\/audit-log\/.+/;
+    return route.location.pathname.match(regex);
+  };
 
-@Path("v2/sample")
-class SampleResource {
+  return (
+    <SecondaryNavigationItem
+      to={match.url + "/audit-log/1"}
+      icon="fas fa-book-open"
+      label={t("scm-audit-log-plugin.navLink")}
+      title={t("scm-audit-log-plugin.navLink")}
+      activeWhenMatch={matchesAuditLog}
+      activeOnlyWhenExact={false}
+    />
+  );
+};
 
-  @GET
-  @Produces(MediaType.TEXT_PLAIN)
-  public String sample() {
-    return "Sample";
-  }
-
-}
+export default AuditLogNavigation;

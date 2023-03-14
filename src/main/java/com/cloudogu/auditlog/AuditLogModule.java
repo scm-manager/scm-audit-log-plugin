@@ -21,11 +21,17 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+package com.cloudogu.auditlog;
 
-describe("frontend unit tests", () => {
+import com.google.inject.AbstractModule;
+import sonia.scm.plugin.Extension;
 
-  it("some test", () => {
-    expect( 21 * 2 ).toBe(42);
-  });
+import javax.inject.Singleton;
 
-});
+@Extension
+public class AuditLogModule extends AbstractModule {
+  @Override
+  protected void configure() {
+    bind(AuditLogService.class).to(DefaultAuditLogService.class).in(Singleton.class);
+  }
+}

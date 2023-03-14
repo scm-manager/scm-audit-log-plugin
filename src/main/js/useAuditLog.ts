@@ -22,28 +22,35 @@
  * SOFTWARE.
  */
 
-plugins {
-  id 'org.scm-manager.smp' version '0.15.0'
+import { apiClient } from "@scm-manager/ui-components";
+import { useQuery } from "react-query";
+import { ApiResult, useRequiredIndexLink } from "@scm-manager/ui-api";
+import { HalRepresentationWithEmbedded } from "@scm-manager/ui-types";
+
+type AuditLogEntry = {
+  timestamp: Date;
+  entity: string;
+  user: string;
+  action: string;
+  entry: string;
 }
 
-dependencies {
-  // define dependencies to other plugins here e.g.:
-  // plugin "sonia.scm.plugins:scm-mail-plugin:2.1.0"
-  // optionalPlugin "sonia.scm.plugins:scm-editor-plugin:2.0.0"
-  implementation 'com.h2database:h2:2.1.214'
-  implementation 'org.javers:javers-core:6.7.1'
+type AuditLogEntries = {
+  entries: AuditLogEntry[];
 }
 
-scmPlugin {
-  scmVersion = "2.42.4-SNAPSHOT"
-  displayName = "Audit Log"
-  description = "Logs various actions on your server"
-  author = "Cloudogu GmbH"
-  category = "Administration"
-
-  openapi {
-    packages = [
-      "com.cloudogu.auditlog"
-    ]
-  }
+type AuditLog = HalRepresentationWithEmbedded<AuditLogEntries> & {
+  page: number;
+  pageTotal: number;
 }
+
+export const useAuditLog = (pageNumber: number, filters: string[]): ApiResult<AuditLog> => {
+  const indexLink = useRequiredIndexLink("auditLog");
+  return useQuery<AuditLog, Error>(["auditLog", pageNumber, filters], () => {
+    let link = indexLink + `?pageNumber=${pageNumber}`;
+    for (const filter in filters) {
+      link += `&filter=${filter}`;
+    }
+    return apiClient.get(link).then(response => response.json());
+  });
+};

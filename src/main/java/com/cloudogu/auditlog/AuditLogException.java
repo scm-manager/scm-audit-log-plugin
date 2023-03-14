@@ -22,28 +22,11 @@
  * SOFTWARE.
  */
 
-plugins {
-  id 'org.scm-manager.smp' version '0.15.0'
-}
+package com.cloudogu.auditlog;
 
-dependencies {
-  // define dependencies to other plugins here e.g.:
-  // plugin "sonia.scm.plugins:scm-mail-plugin:2.1.0"
-  // optionalPlugin "sonia.scm.plugins:scm-editor-plugin:2.0.0"
-  implementation 'com.h2database:h2:2.1.214'
-  implementation 'org.javers:javers-core:6.7.1'
-}
 
-scmPlugin {
-  scmVersion = "2.42.4-SNAPSHOT"
-  displayName = "Audit Log"
-  description = "Logs various actions on your server"
-  author = "Cloudogu GmbH"
-  category = "Administration"
-
-  openapi {
-    packages = [
-      "com.cloudogu.auditlog"
-    ]
+public class AuditLogException extends RuntimeException {
+  public AuditLogException(String message, Throwable cause) {
+    super(message, cause);
   }
 }

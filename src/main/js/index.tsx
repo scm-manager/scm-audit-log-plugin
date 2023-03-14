@@ -23,5 +23,27 @@
  */
 
 import { binder } from "@scm-manager/ui-extensions";
+import { Links } from "@scm-manager/ui-types";
+import React, {FC} from "react";
+import { Route } from "react-router-dom";
+import AuditLogNavigation from "./AuditLogNavigation";
+import AuditLog from "./AuditLog";
 
-binder.bind("", "");
+type PredicateProps = {
+  links: Links;
+};
+
+export const predicate = ({ links }: PredicateProps) => {
+  return !!(links && links.auditLog);
+};
+
+const AuditLogRoute: FC<{ links: Links }> = ({ links }) => {
+  return (
+    <Route path="/admin/audit-log/:page">
+      <AuditLog links={links} />
+    </Route>
+  );
+};
+
+binder.bind("admin.route", AuditLogRoute, predicate);
+binder.bind("admin.navigation", AuditLogNavigation, predicate);

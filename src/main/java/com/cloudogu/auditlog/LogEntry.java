@@ -22,28 +22,23 @@
  * SOFTWARE.
  */
 
-plugins {
-  id 'org.scm-manager.smp' version '0.15.0'
-}
+package com.cloudogu.auditlog;
 
-dependencies {
-  // define dependencies to other plugins here e.g.:
-  // plugin "sonia.scm.plugins:scm-mail-plugin:2.1.0"
-  // optionalPlugin "sonia.scm.plugins:scm-editor-plugin:2.0.0"
-  implementation 'com.h2database:h2:2.1.214'
-  implementation 'org.javers:javers-core:6.7.1'
-}
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
-scmPlugin {
-  scmVersion = "2.42.4-SNAPSHOT"
-  displayName = "Audit Log"
-  description = "Logs various actions on your server"
-  author = "Cloudogu GmbH"
-  category = "Administration"
+import java.time.Instant;
 
-  openapi {
-    packages = [
-      "com.cloudogu.auditlog"
-    ]
-  }
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+public class LogEntry {
+  private Instant timestamp;
+  private String entity;
+  private String user;
+  private String action;
+  private String entry;
 }

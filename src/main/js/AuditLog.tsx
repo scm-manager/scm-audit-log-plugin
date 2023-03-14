@@ -21,29 +21,40 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+import React, { FC } from "react";
+import { useTranslation } from "react-i18next";
+import { ErrorNotification, LinkPaginator, Loading, Title, urls } from "@scm-manager/ui-components";
+import { useAuditLog } from "./useAuditLog";
+import { useRouteMatch } from "react-router-dom";
+import { Links } from "@scm-manager/ui-types";
 
-plugins {
-  id 'org.scm-manager.smp' version '0.15.0'
-}
+const AuditLog: FC<{ links: Links }> = () => {
+  const [t] = useTranslation("plugins");
+  const match = useRouteMatch();
+  const page = urls.getPageFromMatch(match);
 
-dependencies {
-  // define dependencies to other plugins here e.g.:
-  // plugin "sonia.scm.plugins:scm-mail-plugin:2.1.0"
-  // optionalPlugin "sonia.scm.plugins:scm-editor-plugin:2.0.0"
-  implementation 'com.h2database:h2:2.1.214'
-  implementation 'org.javers:javers-core:6.7.1'
-}
+  const { data, error, isLoading } = useAuditLog(page, []);
 
-scmPlugin {
-  scmVersion = "2.42.4-SNAPSHOT"
-  displayName = "Audit Log"
-  description = "Logs various actions on your server"
-  author = "Cloudogu GmbH"
-  category = "Administration"
-
-  openapi {
-    packages = [
-      "com.cloudogu.auditlog"
-    ]
+  if (error) {
+    return <ErrorNotification error={error} />;
   }
-}
+
+  if (isLoading || !data) {
+    // @ts-ignore annoying....
+    return <Loading />;
+  }
+
+  console.log(data);
+
+  return (
+    <>
+      <Title title={t("scm-audit-log-plugin.title")} />
+      {/*//TODO implement filter*/}
+      <pre>{data?._embedded?.entries.map(e => e.entry + "\n")}</pre>
+      <hr />
+      <LinkPaginator collection={data} page={page} filter={""} />
+    </>
+  );
+};
+
+export default AuditLog;

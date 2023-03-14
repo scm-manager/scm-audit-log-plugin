@@ -21,11 +21,16 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-
 package com.cloudogu.auditlog;
 
-import static org.junit.jupiter.api.Assertions.*;
+import org.apache.shiro.SecurityUtils;
 
-class SampleResourceTest {
+class PermissionChecker {
 
+  private PermissionChecker() {
+  }
+
+  public static boolean mayReadAuditLog() {
+    return SecurityUtils.getSubject().isPermitted("auditLog:read");
+  }
 }
