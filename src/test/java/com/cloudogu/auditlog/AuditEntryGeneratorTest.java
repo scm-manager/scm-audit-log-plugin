@@ -187,6 +187,19 @@ class AuditEntryGeneratorTest {
       "  - 'token' = ********\n");
   }
 
+  @Test
+  void shouldMaskFieldsWithEncryptionAutomaticallyOnDerivedClass() {
+    String entry = generator.generate(
+      new EntryCreationContext<>(new DerivativeSecretConfig("test", "secret", "token"), null),
+      Instant.ofEpochSecond(1700000000),
+      "trillian",
+      "modified",
+      "",
+      new String[]{});
+
+    assertThat(entry).contains("'token' = ********");
+  }
+
 }
 
 @AllArgsConstructor
@@ -208,6 +221,12 @@ class TopLevel implements AuditLogEntity {
   @Override
   public String getEntityName() {
     return name;
+  }
+}
+
+class DerivativeSecretConfig extends SecretConfig {
+  public DerivativeSecretConfig(String name, String password, String token) {
+    super(name, password, token);
   }
 }
 

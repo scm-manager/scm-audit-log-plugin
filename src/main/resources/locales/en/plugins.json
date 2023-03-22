@@ -1,7 +1,35 @@
 {
   "scm-audit-log-plugin": {
     "title": "Audit Log",
-    "navLink": "Audit Log"
+    "navLink": "Audit Log",
+    "filter": {
+      "entity": {
+        "label": "Entity name",
+        "helpText": "Name of the related entity, e.g. repository name"
+      },
+      "username": {
+        "label": "Username",
+        "helpText": "Name of the changing user"
+      },
+      "label": {
+        "label": "Label",
+        "helpText": "Label for the category of the change"
+      },
+      "from": {
+        "label": "From",
+        "helpText": "Including date from which filtering is performed"
+      },
+      "to": {
+        "label": "To",
+        "helpText": "Including date up to which filtering is performed"
+      },
+      "action": {
+        "label": "Action",
+        "helpText": "Type of action"
+      },
+      "applyButton": "Apply filter",
+      "resetButton": "Reset filter"
+    }
   },
   "permissions": {
     "auditLog": {

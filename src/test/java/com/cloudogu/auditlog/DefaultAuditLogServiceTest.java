@@ -38,8 +38,11 @@ import sonia.scm.auditlog.EntryCreationContext;
 import sonia.scm.repository.Repository;
 
 import java.sql.Connection;
+import java.sql.Date;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Collection;
 
 import static java.util.Collections.emptySet;
@@ -76,7 +79,7 @@ class DefaultAuditLogServiceTest {
   @SubjectAware(value = "trillian")
   void shouldCreateNewEntryForModified() {
     EntryCreationContext<Repository> creationContext = new EntryCreationContext<>(create42Puzzle(), createHeartOfGold());
-    service.createDBEntry(creationContext);
+    service.createEntry(creationContext);
 
     Collection<LogEntry> entries = service.getEntries(new AuditLogFilterContext());
 
@@ -92,7 +95,7 @@ class DefaultAuditLogServiceTest {
   @SubjectAware(value = "trillian")
   void shouldCreateNewEntryForCreated() {
     EntryCreationContext<Repository> creationContext = new EntryCreationContext<>(create42Puzzle(), null);
-    service.createDBEntry(creationContext);
+    service.createEntry(creationContext);
 
     Collection<LogEntry> entries = service.getEntries(new AuditLogFilterContext());
 
@@ -108,7 +111,7 @@ class DefaultAuditLogServiceTest {
   @SubjectAware(value = "trillian")
   void shouldCreateNewEntryForDeleted() {
     EntryCreationContext<Repository> creationContext = new EntryCreationContext<>(null, create42Puzzle());
-    service.createDBEntry(creationContext);
+    service.createEntry(creationContext);
 
     Collection<LogEntry> entries = service.getEntries(new AuditLogFilterContext());
 
@@ -124,12 +127,12 @@ class DefaultAuditLogServiceTest {
   @SubjectAware(value = "trillian")
   void shouldGetTotalEntries() {
     EntryCreationContext<Repository> creationContext = new EntryCreationContext<>(null, create42Puzzle());
-    service.createDBEntry(creationContext);
-    service.createDBEntry(creationContext);
-    service.createDBEntry(creationContext);
-    service.createDBEntry(creationContext);
-    service.createDBEntry(creationContext);
-    service.createDBEntry(creationContext);
+    service.createEntry(creationContext);
+    service.createEntry(creationContext);
+    service.createEntry(creationContext);
+    service.createEntry(creationContext);
+    service.createEntry(creationContext);
+    service.createEntry(creationContext);
 
     int totalEntries = service.getTotalEntries(new AuditLogFilterContext());
 
@@ -141,7 +144,7 @@ class DefaultAuditLogServiceTest {
   void shouldCreateEntryWithCorrectEntityName() {
     EntryCreationContext<TestEntity> creationContext = new EntryCreationContext<>(new TestEntity("secret_name"), null);
 
-    service.createDBEntry(creationContext);
+    service.createEntry(creationContext);
 
     Collection<LogEntry> entries = service.getEntries(new AuditLogFilterContext());
 
@@ -154,7 +157,7 @@ class DefaultAuditLogServiceTest {
   void shouldCreateEntryWithoutEntityName() {
     EntryCreationContext<WithoutAnnotation> creationContext = new EntryCreationContext<>(new WithoutAnnotation("secret_name"), null);
 
-    service.createDBEntry(creationContext);
+    service.createEntry(creationContext);
 
     Collection<LogEntry> entries = service.getEntries(new AuditLogFilterContext());
 
@@ -167,7 +170,7 @@ class DefaultAuditLogServiceTest {
   void shouldCreateEntryWithExplicitEntityName() {
     EntryCreationContext<WithoutAnnotation> creationContext = new EntryCreationContext<>(new WithoutAnnotation("secret_name"), null, "TRILLIAN", emptySet());
 
-    service.createDBEntry(creationContext);
+    service.createEntry(creationContext);
 
     Collection<LogEntry> entries = service.getEntries(new AuditLogFilterContext());
 
@@ -175,8 +178,144 @@ class DefaultAuditLogServiceTest {
     assertThat(entry.getEntity()).isEqualTo("TRILLIAN");
   }
 
+  @Test
+  @SubjectAware
+  void shouldCreateEntryForServerContext() {
+    EntryCreationContext<TestEntity> creationContext = new EntryCreationContext<>(new TestEntity("secret_name"), null);
+
+    service.createEntry(creationContext);
+
+    Collection<LogEntry> entries = service.getEntries(new AuditLogFilterContext());
+
+    LogEntry entry = entries.iterator().next();
+    assertThat(entry.getUser()).isNull();
+  }
+
+  @Test
+  @SubjectAware(value = "trillian")
+  void shouldGetEntriesByEntityFilter() {
+    prepareDbEntries();
+
+    AuditLogFilterContext filter = new AuditLogFilterContext();
+    filter.setEntity("TRILLIAN");
+    Collection<LogEntry> entries = service.getEntries(filter);
+
+    assertThat(entries).hasSize(1);
+  }
+
+  @Test
+  @SubjectAware(value = "trillian")
+  void shouldGetEntriesByLabelFilter() {
+    prepareDbEntries();
+
+    AuditLogFilterContext filter = new AuditLogFilterContext();
+    filter.setLabel("object");
+    Collection<LogEntry> entries = service.getEntries(filter);
+
+    assertThat(entries).hasSize(1);
+    LogEntry entry = entries.iterator().next();
+    assertThat(entry.getEntity()).isEqualTo("TRILLIAN");
+  }
+
+  @Test
+  @SubjectAware(value = "trillian")
+  void shouldGetEntriesByUsernameFilter() {
+    EntryCreationContext<?> creationContext = new EntryCreationContext<>(new TestEntity("entity"), null, "TRILLIAN", emptySet());
+    service.createEntry(creationContext);
+
+    creationContext = new EntryCreationContext<>(new WithoutAnnotation("anno"), null, "DENT", emptySet());
+    service.createEntry(creationContext);
+
+    AuditLogFilterContext filter = new AuditLogFilterContext();
+    filter.setUsername("trillian");
+    Collection<LogEntry> entries = service.getEntries(filter);
+
+    assertThat(entries).hasSize(2);
+    LogEntry entry = entries.iterator().next();
+    assertThat(entry.getUser()).isEqualTo("trillian");
+  }
+
+  @Test
+  @SubjectAware(value = "trillian")
+  void shouldGetEntriesByFromDateFilter() {
+    prepareDbEntries();
+
+    AuditLogFilterContext filter = new AuditLogFilterContext();
+    filter.setFrom(new Date(Instant.now().minus(5, ChronoUnit.DAYS).toEpochMilli()));
+    Collection<LogEntry> entries = service.getEntries(filter);
+
+    assertThat(entries).hasSize(2);
+  }
+
+  @Test
+  @SubjectAware(value = "trillian")
+  void shouldGetEntriesByToDateFilter() {
+    prepareDbEntries();
+
+    AuditLogFilterContext filter = new AuditLogFilterContext();
+    filter.setTo(new Date(Instant.now().plus(5, ChronoUnit.DAYS).toEpochMilli()));
+    Collection<LogEntry> entries = service.getEntries(filter);
+
+    assertThat(entries).hasSize(2);
+  }
+
+  @Test
+  @SubjectAware(value = "trillian")
+  void shouldGetEntriesByBothDateFilters() {
+    prepareDbEntries();
+
+    AuditLogFilterContext filter = new AuditLogFilterContext();
+    filter.setFrom(new Date(Instant.now().minus(5, ChronoUnit.DAYS).toEpochMilli()));
+    filter.setTo(new Date(Instant.now().plus(5, ChronoUnit.DAYS).toEpochMilli()));
+    Collection<LogEntry> entries = service.getEntries(filter);
+
+    assertThat(entries).hasSize(2);
+  }
+
+  @Test
+  @SubjectAware(value = "trillian")
+  void shouldGetEntriesWithActionFilter() {
+    prepareDbEntries();
+
+    AuditLogFilterContext filter = new AuditLogFilterContext();
+    filter.setAction("modified");
+    Collection<LogEntry> entries = service.getEntries(filter);
+
+    assertThat(entries).hasSize(1);
+  }
+
+  @Test
+  @SubjectAware(value = "trillian")
+  void shouldGetEntriesWithAllFilters() {
+    prepareDbEntries();
+
+    AuditLogFilterContext filter = new AuditLogFilterContext();
+    filter.setFrom(new Date(Instant.now().minus(5, ChronoUnit.DAYS).toEpochMilli()));
+    filter.setTo(new Date(Instant.now().plus(5, ChronoUnit.DAYS).toEpochMilli()));
+    filter.setUsername("trillian");
+    filter.setLabel("test");
+    filter.setEntity("TRILLIAN");
+    filter.setAction("modified");
+    Collection<LogEntry> entries = service.getEntries(filter);
+
+    assertThat(entries).hasSize(1);
+    LogEntry entry = entries.iterator().next();
+
+    assertThat(entry.getEntry()).contains("[MODIFIED] 'trillian' modified test object more \n" +
+      "Diff:\n" +
+      "  - 'name' changed: 'oldEntity' -> 'entity'");
+  }
+
+  private void prepareDbEntries() {
+    EntryCreationContext<?> first = new EntryCreationContext<>(new TestEntity("entity"), new TestEntity("oldEntity"), "TRILLIAN", emptySet());
+    service.createEntry(first);
+
+    EntryCreationContext<?> second = new EntryCreationContext<>(new WithoutAnnotation("anno"), null, "DENT", emptySet());
+    service.createEntry(second);
+  }
+
   @AllArgsConstructor
-  @AuditEntry(labels = {"test", "object"})
+  @AuditEntry(labels = {"test", "object", "more"})
   static class TestEntity implements AuditLogEntity {
     private String name;
 

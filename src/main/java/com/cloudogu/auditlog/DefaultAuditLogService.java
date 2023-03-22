@@ -29,8 +29,7 @@ import com.google.common.base.Strings;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.shiro.SecurityUtils;
-import sonia.scm.auditlog.AuditEntry;
-import sonia.scm.auditlog.AuditLogEntity;
+import org.apache.shiro.UnavailableSecurityManagerException;
 import sonia.scm.auditlog.EntryCreationContext;
 import sonia.scm.plugin.Extension;
 
@@ -45,12 +44,20 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
-import static java.util.Arrays.stream;
-import static java.util.stream.Stream.concat;
+import static com.cloudogu.auditlog.EntryContextResolver.resolveAction;
+import static com.cloudogu.auditlog.EntryContextResolver.resolveEntityName;
+import static com.cloudogu.auditlog.EntryContextResolver.resolveLabels;
+import static com.cloudogu.auditlog.Filters.resolveAppliedFilters;
+import static com.cloudogu.auditlog.Filters.setFilterValues;
+import static com.cloudogu.auditlog.SqlQueryGenerator.createCountQuery;
+import static com.cloudogu.auditlog.SqlQueryGenerator.createEntriesQuery;
+import static com.cloudogu.auditlog.SqlQueryGenerator.createLabelsQuery;
 
 @Slf4j
 @Extension
@@ -75,7 +82,8 @@ public class DefaultAuditLogService implements AuditLogService {
   }
 
   @VisibleForTesting
-  @SuppressWarnings("java:S2115") // We don't need a password here. This database contains no secrets.
+  @SuppressWarnings("java:S2115")
+    // We don't need a password here. This database contains no secrets.
   DefaultAuditLogService(AuditLogDatabase database, Executor executor) {
     this.database = database;
     this.executor = executor;
@@ -83,14 +91,13 @@ public class DefaultAuditLogService implements AuditLogService {
 
   @Override
   public void createEntry(EntryCreationContext<?> context) {
-    executor.execute(() -> createDBEntry(context));
+    String username = getUsername();
+    executor.execute(() -> createDBEntry(username, context));
   }
 
-  @VisibleForTesting
-  <T> void createDBEntry(EntryCreationContext<T> context) {
+  private void createDBEntry(String username, EntryCreationContext<?> context) {
     Instant timestamp = Instant.now();
     String entityName = resolveEntityName(context);
-    String username = SecurityUtils.getSubject().getPrincipal().toString();
     String action = resolveAction(context);
     String[] labels = resolveLabels(context);
     String entry = entryGenerator.generate(context, timestamp, username, action, entityName, labels);
@@ -98,7 +105,7 @@ public class DefaultAuditLogService implements AuditLogService {
       "INSERT INTO AUDITLOG(TIMESTAMP_, ENTITY, USERNAME, ACTION_, ENTRY) VALUES (?, ?, ?, ?, ?)",
       Statement.RETURN_GENERATED_KEYS)
     ) {
-      statement.setTimestamp(1, new Timestamp(timestamp.getEpochSecond()));
+      statement.setTimestamp(1, new Timestamp(timestamp.toEpochMilli()));
       statement.setString(2, entityName);
       statement.setString(3, username);
       statement.setString(4, action);
@@ -115,10 +122,12 @@ public class DefaultAuditLogService implements AuditLogService {
   }
 
   public Collection<LogEntry> getEntries(AuditLogFilterContext filterContext) {
-    try (Connection connection = database.getConnection(); Statement statement = connection.createStatement()) {
+    List<Filters.AppliedFilter> appliedFilters = resolveAppliedFilters(filterContext);
+    String query = createEntriesQuery(filterContext, appliedFilters);
+    try (Connection connection = database.getConnection(); PreparedStatement statement = connection.prepareStatement(query)) {
+      setFilterValues(statement, appliedFilters);
+      ResultSet resultSet = statement.executeQuery();
       List<LogEntry> entries = new ArrayList<>();
-      String query = createEntriesQuery(filterContext);
-      ResultSet resultSet = statement.executeQuery(query);
       while (resultSet.next()) {
         addSingleEntry(entries, resultSet);
       }
@@ -130,9 +139,11 @@ public class DefaultAuditLogService implements AuditLogService {
 
   @Override
   public int getTotalEntries(AuditLogFilterContext filterContext) {
-    try (Connection connection = database.getConnection(); Statement statement = connection.createStatement()) {
-      String query = createCountQuery(filterContext);
-      ResultSet resultSet = statement.executeQuery(query);
+    List<Filters.AppliedFilter> appliedFilters = resolveAppliedFilters(filterContext);
+    String query = createCountQuery(filterContext, appliedFilters);
+    try (Connection connection = database.getConnection(); PreparedStatement statement = connection.prepareStatement(query)) {
+      setFilterValues(statement, appliedFilters);
+      ResultSet resultSet = statement.executeQuery();
       resultSet.next();
       return resultSet.getInt("total");
     } catch (SQLException e) {
@@ -140,22 +151,29 @@ public class DefaultAuditLogService implements AuditLogService {
     }
   }
 
-  private <T> String[] resolveLabels(EntryCreationContext<T> context) {
-    T object = getObject(context);
-    String[] auditEntryAnnotationLabels;
-    AuditEntry annotation = object.getClass().getAnnotation(AuditEntry.class);
-    if (annotation != null) {
-      auditEntryAnnotationLabels = annotation.labels();
-    } else {
-      auditEntryAnnotationLabels = new String[]{};
+  @Override
+  public Set<String> getLabels() {
+    try (Connection connection = database.getConnection(); Statement statement = connection.createStatement()) {
+      String query = createLabelsQuery();
+      ResultSet resultSet = statement.executeQuery(query);
+
+      Set<String> labels = new HashSet<>();
+      while (resultSet.next()) {
+        labels.add(resultSet.getString("LABEL"));
+      }
+      return labels;
+    } catch (SQLException e) {
+      throw new AuditLogException("Failed to collect audit log labels", e);
     }
-    return concat(stream(auditEntryAnnotationLabels), context.getAdditionalLabels().stream())
-      .distinct()
-      .toArray(String[]::new);
   }
 
-  <T> T getObject(EntryCreationContext<T> context) {
-    return context.getObject() != null ? context.getObject() : context.getOldObject();
+  private static String getUsername() {
+    try {
+      Object principal = SecurityUtils.getSubject().getPrincipal();
+      return principal == null ? null : principal.toString();
+    } catch (UnavailableSecurityManagerException e) {
+      return null;
+    }
   }
 
   private void createLabelsForNewEntry(int id, String[] labels) throws SQLException {
@@ -167,41 +185,6 @@ public class DefaultAuditLogService implements AuditLogService {
         statement.executeUpdate();
       }
     }
-  }
-
-  private <T> String resolveEntityName(EntryCreationContext<T> context) {
-    if (!Strings.isNullOrEmpty(context.getEntity())) {
-      return Strings.nullToEmpty(context.getEntity());
-    }
-
-    T object = getObject(context);
-    if (object instanceof AuditLogEntity) {
-      return ((AuditLogEntity) object).getEntityName();
-    }
-    return "";
-  }
-
-  static <T> String resolveAction(EntryCreationContext<T> context) {
-    if (context.getOldObject() == null) {
-      return "created";
-    }
-    if (context.getObject() == null) {
-      return "deleted";
-    }
-    return "modified";
-  }
-
-  private String createEntriesQuery(AuditLogFilterContext filterContext) {
-    return "SELECT * FROM AUDITLOG " +
-      //TODO join tables and filter for labels
-      "ORDER BY ID DESC " +
-      "LIMIT " + filterContext.getLimit() + " " +
-      "OFFSET " + (filterContext.getPageNumber() - 1) * filterContext.getLimit() + ";";
-  }
-
-  private String createCountQuery(AuditLogFilterContext filterContext) {
-    return "SELECT COUNT(*) AS total FROM AUDITLOG;";
-    //TODO join tables and filter for labels
   }
 
   private void addSingleEntry(List<LogEntry> entries, ResultSet resultSet) throws SQLException {

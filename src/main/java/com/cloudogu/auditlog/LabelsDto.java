@@ -21,30 +21,18 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-import React, { FC } from "react";
-import { SecondaryNavigationItem } from "@scm-manager/ui-components";
-import { useTranslation } from "react-i18next";
-import { useRouteMatch } from "react-router-dom";
 
-const AuditLogNavigation: FC = () => {
-  const [t] = useTranslation("plugins");
-  const match = useRouteMatch();
+package com.cloudogu.auditlog;
 
-  const matchesAuditLog = (route: any) => {
-    const regex = /\/admin\/audit-log\/.+/;
-    return route.location.pathname.match(regex);
-  };
+import de.otto.edison.hal.HalRepresentation;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 
-  return (
-    <SecondaryNavigationItem
-      to={match.url + "/audit-log/"}
-      icon="fas fa-book-open"
-      label={t("scm-audit-log-plugin.navLink")}
-      title={t("scm-audit-log-plugin.navLink")}
-      activeWhenMatch={matchesAuditLog}
-      activeOnlyWhenExact={false}
-    />
-  );
-};
+import java.util.Set;
 
-export default AuditLogNavigation;
+@AllArgsConstructor
+@Getter
+@SuppressWarnings("java:S2160") // Equals and hashcode not needed
+public class LabelsDto extends HalRepresentation {
+  private Set<String> labels;
+}

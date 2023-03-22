@@ -27,8 +27,11 @@ package com.cloudogu.auditlog;
 import sonia.scm.auditlog.Auditor;
 
 import java.util.Collection;
+import java.util.Set;
 
 public interface AuditLogService extends Auditor {
   Collection<LogEntry> getEntries(AuditLogFilterContext filterContext);
   int getTotalEntries(AuditLogFilterContext filterContext);
+
+  Set<String> getLabels();
 }

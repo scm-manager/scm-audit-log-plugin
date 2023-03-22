@@ -22,10 +22,10 @@
  * SOFTWARE.
  */
 
-import { binder } from "@scm-manager/ui-extensions";
+import { binder, extensionPoints } from "@scm-manager/ui-extensions";
 import { Links } from "@scm-manager/ui-types";
-import React, {FC} from "react";
-import { Route } from "react-router-dom";
+import React, { FC } from "react";
+import { Route, Switch } from "react-router-dom";
 import AuditLogNavigation from "./AuditLogNavigation";
 import AuditLog from "./AuditLog";
 
@@ -39,11 +39,16 @@ export const predicate = ({ links }: PredicateProps) => {
 
 const AuditLogRoute: FC<{ links: Links }> = ({ links }) => {
   return (
-    <Route path="/admin/audit-log/:page">
-      <AuditLog links={links} />
-    </Route>
+    <Switch>
+      <Route path="/admin/audit-log/" exact>
+        <AuditLog links={links} />
+      </Route>
+      <Route path="/admin/audit-log/:page" exact>
+        <AuditLog links={links} />
+      </Route>
+    </Switch>
   );
 };
 
-binder.bind("admin.route", AuditLogRoute, predicate);
-binder.bind("admin.navigation", AuditLogNavigation, predicate);
+binder.bind<extensionPoints.AdminRoute>("admin.route", AuditLogRoute, predicate);
+binder.bind<extensionPoints.AdminNavigation>("admin.navigation", AuditLogNavigation, predicate);

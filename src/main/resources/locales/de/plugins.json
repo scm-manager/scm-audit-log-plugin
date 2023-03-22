@@ -1,7 +1,35 @@
 {
   "scm-audit-log-plugin": {
     "title": "Audit Log",
-    "navLink": "Audit Log"
+    "navLink": "Audit Log",
+    "filter": {
+      "entity": {
+        "label": "Name der Entität",
+        "helpText": "Name der bezogenen Entität, z. B. Repository-Name"
+      },
+      "username": {
+        "label": "Benutzername",
+        "helpText": "Name der ausführenden Benutzers"
+      },
+      "label": {
+        "label": "Label",
+        "helpText": "Label für die Kategorie der Änderung"
+      },
+      "from": {
+        "label": "Seit",
+        "helpText": "Einschließliches Datum ab dem gefiltert wird"
+      },
+      "to": {
+        "label": "Bis",
+        "helpText": "Einschließliches Datum bis zu dem gefiltert wird"
+      },
+      "action": {
+        "label": "Aktion",
+        "helpText": "Art der Aktion"
+      },
+      "applyButton": "Filter anwenden",
+      "resetButton": "Filter zurücksetzen"
+    }
   },
   "permissions": {
     "auditLog": {

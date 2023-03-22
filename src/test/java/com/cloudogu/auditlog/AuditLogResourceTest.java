@@ -46,7 +46,9 @@ import java.time.Instant;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -97,6 +99,24 @@ class AuditLogResourceTest {
   }
 
   @Test
+  void shouldGetEntriesAsTextWithFilter() throws URISyntaxException {
+    MockHttpRequest request = MockHttpRequest.get("/v2/audit-log?entity=scmadmin&username=trillian&from=2023-01-01&to=2023-02-01&label=jenkins");
+    MockHttpResponse response = new MockHttpResponse();
+
+    restDispatcher.invoke(request, response);
+
+    verify(service).getEntries(argThat(filterContext -> {
+      assertThat(filterContext.getEntity()).isEqualTo("scmadmin");
+      assertThat(filterContext.getUsername()).isEqualTo("trillian");
+      assertThat(filterContext.getLabel()).isEqualTo("jenkins");
+      assertThat(filterContext.getFrom()).hasToString("2023-01-01");
+      // Day increased by one to 'include' all matches
+      assertThat(filterContext.getTo()).hasToString("2023-02-02");
+      return true;
+    }));
+  }
+
+  @Test
   void shouldGetEntriesAsJson() throws URISyntaxException {
     when(service.getEntries(any())).thenReturn(ImmutableList.of(
       new LogEntry(Instant.ofEpochMilli(1700000000), "admins", "trillian", "modified",
@@ -136,5 +156,23 @@ class AuditLogResourceTest {
     assertThat(links.get("self")).isNotNull();
     assertThat(links.get("first")).isNotNull();
     assertThat(links.get("last")).isNotNull();
+  }
+
+  @Test
+  void shouldGetEntriesAsJsonWithFilter() throws URISyntaxException {
+    MockHttpRequest request = MockHttpRequest.get("/v2/audit-log/paginated?entity=scmadmin&username=trillian&from=2023-01-01&to=2023-02-01&label=jenkins");
+    MockHttpResponse response = new MockHttpResponse();
+
+    restDispatcher.invoke(request, response);
+
+    verify(service).getEntries(argThat(filterContext -> {
+      assertThat(filterContext.getEntity()).isEqualTo("scmadmin");
+      assertThat(filterContext.getUsername()).isEqualTo("trillian");
+      assertThat(filterContext.getLabel()).isEqualTo("jenkins");
+      assertThat(filterContext.getFrom()).hasToString("2023-01-01");
+      // Day increased by one to 'include' all matches
+      assertThat(filterContext.getTo()).hasToString("2023-02-02");
+      return true;
+    }));
   }
 }

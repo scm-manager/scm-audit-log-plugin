@@ -33,24 +33,29 @@ type AuditLogEntry = {
   user: string;
   action: string;
   entry: string;
-}
+};
 
 type AuditLogEntries = {
   entries: AuditLogEntry[];
-}
+};
 
 type AuditLog = HalRepresentationWithEmbedded<AuditLogEntries> & {
   page: number;
   pageTotal: number;
-}
+};
 
-export const useAuditLog = (pageNumber: number, filters: string[]): ApiResult<AuditLog> => {
+export type Filters = Record<string, string>;
+
+export const useAuditLog = (pageNumber: number, filters: Filters): ApiResult<AuditLog> => {
   const indexLink = useRequiredIndexLink("auditLog");
-  return useQuery<AuditLog, Error>(["auditLog", pageNumber, filters], () => {
-    let link = indexLink + `?pageNumber=${pageNumber}`;
-    for (const filter in filters) {
-      link += `&filter=${filter}`;
-    }
-    return apiClient.get(link).then(response => response.json());
-  });
+  return useQuery<AuditLog, Error>(["auditLog", pageNumber, filters], () =>
+    apiClient
+      .get(
+        Object.entries(filters).reduce(
+          (link, [filterKey, filterValue]) => (filterValue ? `${link}&${filterKey}=${filterValue}` : link),
+          indexLink + `?pageNumber=${pageNumber}`
+        )
+      )
+      .then(response => response.json())
+  );
 };

@@ -49,7 +49,6 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.util.EnumSet;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.damnhandy.uri.template.UriTemplate.fromTemplate;
@@ -96,8 +95,14 @@ public class AuditLogResource {
   )
   public String getAuditLog(@DefaultValue("1") @QueryParam("pageNumber") int page,
                             @DefaultValue("100") @QueryParam("pageSize") int limit,
-                            @QueryParam("filter") Set<String> filter) {
-    return auditLogService.getEntries(new AuditLogFilterContext(page, limit, filter))
+                            @QueryParam("entity") String entity,
+                            @QueryParam("username") String username,
+                            @QueryParam("from") String from,
+                            @QueryParam("to") String to,
+                            @QueryParam("label") String label,
+                            @QueryParam("action") String action
+  ) {
+    return auditLogService.getEntries(new AuditLogFilterContext(page, limit, entity, username, from, to, label, action))
       .stream()
       .map(LogEntry::getEntry)
       .collect(Collectors.joining("\n"));
@@ -111,7 +116,7 @@ public class AuditLogResource {
     responseCode = "200",
     description = "success",
     content = @Content(
-      mediaType = MediaType.TEXT_PLAIN
+      mediaType = MediaType.APPLICATION_JSON
     )
   )
   @ApiResponse(responseCode = "401", description = "not authenticated / invalid credentials")
@@ -126,8 +131,14 @@ public class AuditLogResource {
   )
   public Response getPaginatedAuditLog(@DefaultValue("1") @QueryParam("pageNumber") int page,
                                        @DefaultValue("100") @QueryParam("pageSize") int limit,
-                                       @QueryParam("filter") Set<String> filter) {
-    AuditLogFilterContext filterContext = new AuditLogFilterContext(page, limit, filter);
+                                       @QueryParam("entity") String entity,
+                                       @QueryParam("username") String username,
+                                       @QueryParam("from") String from,
+                                       @QueryParam("to") String to,
+                                       @QueryParam("label") String label,
+                                       @QueryParam("action") String action
+  ) {
+    AuditLogFilterContext filterContext = new AuditLogFilterContext(page, limit, entity, username, from, to, label, action);
     List<LogEntryDto> entries = auditLogService.getEntries(filterContext)
       .stream()
       .map(LogEntryDto::from)
@@ -140,7 +151,10 @@ public class AuditLogResource {
     NumberedPaging paging = oneBasedNumberedPaging(filterContext.getPageNumber(), filterContext.getLimit(), totalEntries);
     AuditLogDto auditLogDto = new AuditLogDto(
       createLinks(paging, filterContext),
-      embeddedBuilder().with("entries", entries).build()
+      embeddedBuilder()
+        .with("entries", entries)
+        .with("labels", new LabelsDto(auditLogService.getLabels()))
+        .build()
     );
     auditLogDto.setPage(filterContext.getPageNumber() - 1);
     auditLogDto.setPageTotal(computePageTotal(filterContext.getLimit(), totalEntries));

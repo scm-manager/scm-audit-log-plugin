@@ -37,13 +37,14 @@ import sonia.scm.xml.XmlCipherStringAdapter;
 import sonia.scm.xml.XmlEncryptionAdapter;
 
 import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
+import java.lang.reflect.Field;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 
-import static com.cloudogu.auditlog.DefaultAuditLogService.resolveAction;
+import static com.cloudogu.auditlog.EntryContextResolver.resolveAction;
 
 public class AuditEntryGenerator {
 
@@ -51,6 +52,8 @@ public class AuditEntryGenerator {
 
   private static final String REPOSITORY_LABEL = "repository";
   private static final String NAMESPACE_LABEL = "namespace";
+  private static final String USER_LABEL = "user";
+  private static final String GROUP_LABEL = "group";
   private static final PrettyValuePrinter PRETTY_VALUE_PRINTER = PrettyValuePrinter.getDefault();
   private final Javers javers = JaversBuilder.javers().build();
 
@@ -68,7 +71,10 @@ public class AuditEntryGenerator {
       }
     } else {
       for (String label : labels) {
-        if (!label.equalsIgnoreCase(REPOSITORY_LABEL) && !label.equalsIgnoreCase(NAMESPACE_LABEL)) {
+        if (!label.equalsIgnoreCase(REPOSITORY_LABEL)
+          && !label.equalsIgnoreCase(NAMESPACE_LABEL)
+          && !label.equalsIgnoreCase(GROUP_LABEL)
+          && !label.equalsIgnoreCase(USER_LABEL)) {
           builder.append(label).append(" ");
         }
       }
@@ -76,6 +82,10 @@ public class AuditEntryGenerator {
         builder.append("for repository '").append(entityName).append("'");
       } else if (Arrays.stream(labels).anyMatch(l -> l.equalsIgnoreCase(NAMESPACE_LABEL))) {
         builder.append("for namespace '").append(entityName).append("'");
+      } else if (Arrays.stream(labels).anyMatch(l -> l.equalsIgnoreCase(GROUP_LABEL))) {
+        builder.append("for group '").append(entityName).append("'");
+      } else if (Arrays.stream(labels).anyMatch(l -> l.equalsIgnoreCase(USER_LABEL))) {
+        builder.append("for user '").append(entityName).append("'");
       }
     }
 
@@ -145,7 +155,7 @@ public class AuditEntryGenerator {
       return true;
     } else {
       try {
-        XmlJavaTypeAdapter adapterClass = object.getClass().getDeclaredField(fieldName).getAnnotation(XmlJavaTypeAdapter.class);
+        XmlJavaTypeAdapter adapterClass = findField(object.getClass(), fieldName).getAnnotation(XmlJavaTypeAdapter.class);
         if (adapterClass != null) {
           return adapterClass.value().isAssignableFrom(XmlCipherStringAdapter.class) || adapterClass.value().isAssignableFrom(XmlEncryptionAdapter.class);
         }
@@ -154,5 +164,16 @@ public class AuditEntryGenerator {
       }
     }
     return false;
+  }
+
+  private static <T> Field findField(Class<T> clazz, String fieldName) throws NoSuchFieldException {
+    try {
+      return clazz.getDeclaredField(fieldName);
+    } catch (NoSuchFieldException e) {
+      if (clazz.getSuperclass() != null) {
+        return findField(clazz.getSuperclass(), fieldName);
+      }
+      throw e;
+    }
   }
 }

@@ -21,30 +21,32 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-import React, { FC } from "react";
-import { SecondaryNavigationItem } from "@scm-manager/ui-components";
-import { useTranslation } from "react-i18next";
-import { useRouteMatch } from "react-router-dom";
 
-const AuditLogNavigation: FC = () => {
-  const [t] = useTranslation("plugins");
-  const match = useRouteMatch();
+package com.cloudogu.auditlog;
 
-  const matchesAuditLog = (route: any) => {
-    const regex = /\/admin\/audit-log\/.+/;
-    return route.location.pathname.match(regex);
-  };
+import java.util.List;
 
-  return (
-    <SecondaryNavigationItem
-      to={match.url + "/audit-log/"}
-      icon="fas fa-book-open"
-      label={t("scm-audit-log-plugin.navLink")}
-      title={t("scm-audit-log-plugin.navLink")}
-      activeWhenMatch={matchesAuditLog}
-      activeOnlyWhenExact={false}
-    />
-  );
-};
+import static com.cloudogu.auditlog.Filters.createFilterQuery;
 
-export default AuditLogNavigation;
+public class SqlQueryGenerator {
+
+  private SqlQueryGenerator() {}
+
+  static String createEntriesQuery(AuditLogFilterContext filterContext, List<Filters.AppliedFilter> appliedFilters) {
+    return "SELECT TIMESTAMP_,ENTITY,USERNAME,ACTION_,ENTRY FROM AUDITLOG " +
+      createFilterQuery(filterContext, appliedFilters) +
+      "GROUP BY TIMESTAMP_,ENTITY,USERNAME,ACTION_,ENTRY " +
+      "ORDER BY ID DESC " +
+      "LIMIT " + filterContext.getLimit() + " " +
+      "OFFSET " + (filterContext.getPageNumber() - 1) * filterContext.getLimit() + ";";
+  }
+
+  static String createCountQuery(AuditLogFilterContext filterContext, List<Filters.AppliedFilter> appliedFilters) {
+    return "SELECT COUNT(*) AS total FROM AUDITLOG "
+      + createFilterQuery(filterContext, appliedFilters) + ";";
+  }
+
+  static String createLabelsQuery() {
+    return "SELECT DISTINCT LABEL FROM LABELS";
+  }
+}
