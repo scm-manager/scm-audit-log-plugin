@@ -52,6 +52,7 @@ public class IndexLinkEnricher implements HalEnricher {
     if (PermissionChecker.mayReadAuditLog()) {
       LinkBuilder linkBuilder = new LinkBuilder(pathInfoStore.get().get(), AuditLogResource.class);
       appender.appendLink("auditLog", linkBuilder.method("getPaginatedAuditLog").parameters().href());
+      appender.appendLink("auditLogCsvExport", linkBuilder.method("exportAuditLogAsCsv").parameters().href());
     }
   }
 }

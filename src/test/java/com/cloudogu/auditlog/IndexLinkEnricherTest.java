@@ -68,7 +68,8 @@ class IndexLinkEnricherTest {
     when(scmPathInfoStore.get()).thenReturn(() -> URI.create("/scm/"));
     enricher.enrich(context, appender);
 
-    verify(appender).appendLink("auditLog", "/scm/v2/audit-log/paginated");
+    verify(appender).appendLink("auditLog", "/scm/v2/audit-log");
+    verify(appender).appendLink("auditLogCsvExport", "/scm/v2/audit-log/export/csv");
   }
 
 

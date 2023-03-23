@@ -26,6 +26,8 @@ package com.cloudogu.auditlog;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableList;
+import org.github.sdorra.jse.ShiroExtension;
+import org.github.sdorra.jse.SubjectAware;
 import org.jboss.resteasy.mock.MockHttpRequest;
 import org.jboss.resteasy.mock.MockHttpResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,7 +53,8 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, ShiroExtension.class})
+@SubjectAware(value = "trillian")
 class AuditLogResourceTest {
 
   @Mock
@@ -78,12 +81,12 @@ class AuditLogResourceTest {
     when(service.getEntries(any())).thenReturn(ImmutableList.of(new LogEntry(Instant.ofEpochMilli(1700000000), "admins", "trillian", "modified", "2023-11-14T22:13:20Z [MODIFIED] 'trillian' modified group 'admins'\n" +
       "Diff:\n" +
       "* changes on sonia.scm.group.Group/ :\n" +
-      "  - 'type' changed: 'external' -> 'internal'"),new LogEntry(Instant.ofEpochMilli(1700000000), "admins", "trillian", "modified", "2023-11-14T22:13:20Z [MODIFIED] 'trillian' modified group 'admins'\n" +
+      "  - 'type' changed: 'external' -> 'internal'"), new LogEntry(Instant.ofEpochMilli(1700000000), "admins", "trillian", "modified", "2023-11-14T22:13:20Z [MODIFIED] 'trillian' modified group 'admins'\n" +
       "Diff:\n" +
       "* changes on sonia.scm.group.Group/ :\n" +
       "  - 'type' changed: 'internal' -> 'external'")));
 
-    MockHttpRequest request = MockHttpRequest.get("/v2/audit-log");
+    MockHttpRequest request = MockHttpRequest.get("/v2/audit-log/export/text-plain");
     MockHttpResponse response = new MockHttpResponse();
 
     restDispatcher.invoke(request, response);
@@ -95,12 +98,50 @@ class AuditLogResourceTest {
       "2023-11-14T22:13:20Z [MODIFIED] 'trillian' modified group 'admins'\n" +
       "Diff:\n" +
       "* changes on sonia.scm.group.Group/ :\n" +
-      "  - 'type' changed: 'internal' -> 'external'");
+      "  - 'type' changed: 'internal' -> 'external'\n");
   }
 
   @Test
   void shouldGetEntriesAsTextWithFilter() throws URISyntaxException {
-    MockHttpRequest request = MockHttpRequest.get("/v2/audit-log?entity=scmadmin&username=trillian&from=2023-01-01&to=2023-02-01&label=jenkins");
+    MockHttpRequest request = MockHttpRequest.get("/v2/audit-log/export/text-plain?entity=scmadmin&username=trillian&from=2023-01-01&to=2023-02-01&label=jenkins");
+    MockHttpResponse response = new MockHttpResponse();
+
+    restDispatcher.invoke(request, response);
+
+    verify(service).getEntries(argThat(filterContext -> {
+      assertThat(filterContext.getEntity()).isEqualTo("scmadmin");
+      assertThat(filterContext.getUsername()).isEqualTo("trillian");
+      assertThat(filterContext.getLabel()).isEqualTo("jenkins");
+      assertThat(filterContext.getFrom()).hasToString("2023-01-01");
+      // Day increased by one to 'include' all matches
+      assertThat(filterContext.getTo()).hasToString("2023-02-02");
+      return true;
+    }));
+  }
+
+  @Test
+  void shouldGetEntriesAsCsv() throws URISyntaxException, UnsupportedEncodingException {
+    when(service.getEntries(any())).thenReturn(ImmutableList.of(new LogEntry(Instant.ofEpochMilli(1700000000), "admins", "trillian", "modified", "2023-11-14T22:13:20Z [MODIFIED] 'trillian' modified group 'admins'\n" +
+      "Diff:\n" +
+      "* changes on sonia.scm.group.Group/ :\n" +
+      "  - 'type' changed: 'external' -> 'internal'"), new LogEntry(Instant.ofEpochMilli(1700000000), "admins", "trillian", "modified", "2023-11-14T22:13:20Z [MODIFIED] 'trillian' modified group 'admins'\n" +
+      "Diff:\n" +
+      "* changes on sonia.scm.group.Group/ :\n" +
+      "  - 'type' changed: 'internal' -> 'external'")));
+
+    MockHttpRequest request = MockHttpRequest.get("/v2/audit-log/export/csv");
+    MockHttpResponse response = new MockHttpResponse();
+
+    restDispatcher.invoke(request, response);
+
+    assertThat(response.getContentAsString()).contains("Timestamp,Username,Action,Entity,Diff")
+      .contains("trillian,modified,admins,2023-11-14T22:13:20Z [MODIFIED] 'trillian' modified group 'admins' Diff: * changes on sonia.scm.group.Group/ :   - 'type' changed: 'external' -> 'internal'")
+      .contains("trillian,modified,admins,2023-11-14T22:13:20Z [MODIFIED] 'trillian' modified group 'admins' Diff: * changes on sonia.scm.group.Group/ :   - 'type' changed: 'internal' -> 'external'");
+  }
+
+  @Test
+  void shouldGetEntriesAsCsvWithFilter() throws URISyntaxException {
+    MockHttpRequest request = MockHttpRequest.get("/v2/audit-log/export/csv?entity=scmadmin&username=trillian&from=2023-01-01&to=2023-02-01&label=jenkins");
     MockHttpResponse response = new MockHttpResponse();
 
     restDispatcher.invoke(request, response);
@@ -121,18 +162,18 @@ class AuditLogResourceTest {
     when(service.getEntries(any())).thenReturn(ImmutableList.of(
       new LogEntry(Instant.ofEpochMilli(1700000000), "admins", "trillian", "modified",
         "2023-11-14T22:13:20Z [MODIFIED] 'trillian' modified group 'admins'\n" +
-      "Diff:\n" +
-      "* changes on sonia.scm.group.Group/ :\n" +
-      "  - 'type' changed: 'external' -> 'internal'"),
+          "Diff:\n" +
+          "* changes on sonia.scm.group.Group/ :\n" +
+          "  - 'type' changed: 'external' -> 'internal'"),
       new LogEntry(Instant.ofEpochMilli(1700000000), "admins", "trillian", "modified",
         "2023-11-14T22:13:20Z [MODIFIED] 'trillian' modified group 'admins'\n" +
-      "Diff:\n" +
-      "* changes on sonia.scm.group.Group/ :\n" +
-      "  - 'type' changed: 'internal' -> 'external'")));
+          "Diff:\n" +
+          "* changes on sonia.scm.group.Group/ :\n" +
+          "  - 'type' changed: 'internal' -> 'external'")));
 
     when(service.getTotalEntries(any())).thenReturn(1);
 
-    MockHttpRequest request = MockHttpRequest.get("/v2/audit-log/paginated");
+    MockHttpRequest request = MockHttpRequest.get("/v2/audit-log");
     JsonMockHttpResponse response = new JsonMockHttpResponse();
 
     restDispatcher.invoke(request, response);
@@ -143,9 +184,9 @@ class AuditLogResourceTest {
 
     assertThat(content.get("_embedded").get("entries").get(0).get("entry").textValue())
       .isEqualTo("2023-11-14T22:13:20Z [MODIFIED] 'trillian' modified group 'admins'\n" +
-      "Diff:\n" +
-      "* changes on sonia.scm.group.Group/ :\n" +
-      "  - 'type' changed: 'external' -> 'internal'");
+        "Diff:\n" +
+        "* changes on sonia.scm.group.Group/ :\n" +
+        "  - 'type' changed: 'external' -> 'internal'");
     assertThat(content.get("_embedded").get("entries").get(1).get("entry").textValue())
       .isEqualTo("2023-11-14T22:13:20Z [MODIFIED] 'trillian' modified group 'admins'\n" +
         "Diff:\n" +
@@ -160,7 +201,7 @@ class AuditLogResourceTest {
 
   @Test
   void shouldGetEntriesAsJsonWithFilter() throws URISyntaxException {
-    MockHttpRequest request = MockHttpRequest.get("/v2/audit-log/paginated?entity=scmadmin&username=trillian&from=2023-01-01&to=2023-02-01&label=jenkins");
+    MockHttpRequest request = MockHttpRequest.get("/v2/audit-log?entity=scmadmin&username=trillian&from=2023-01-01&to=2023-02-01&label=jenkins");
     MockHttpResponse response = new MockHttpResponse();
 
     restDispatcher.invoke(request, response);
@@ -175,4 +216,5 @@ class AuditLogResourceTest {
       return true;
     }));
   }
+
 }

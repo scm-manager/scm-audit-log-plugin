@@ -68,6 +68,7 @@ public class DefaultAuditLogService implements AuditLogService {
   private final Executor executor;
   private final AuditEntryGenerator entryGenerator = new AuditEntryGenerator();
 
+
   @Inject
   public DefaultAuditLogService(AuditLogDatabase database) {
     this(
@@ -122,6 +123,12 @@ public class DefaultAuditLogService implements AuditLogService {
   }
 
   public Collection<LogEntry> getEntries(AuditLogFilterContext filterContext) {
+    PermissionChecker.checkReadAuditLog();
+    return getLogEntries(filterContext);
+  }
+
+  @VisibleForTesting
+  List<LogEntry> getLogEntries(AuditLogFilterContext filterContext) {
     List<Filters.AppliedFilter> appliedFilters = resolveAppliedFilters(filterContext);
     String query = createEntriesQuery(filterContext, appliedFilters);
     try (Connection connection = database.getConnection(); PreparedStatement statement = connection.prepareStatement(query)) {
@@ -139,6 +146,7 @@ public class DefaultAuditLogService implements AuditLogService {
 
   @Override
   public int getTotalEntries(AuditLogFilterContext filterContext) {
+    PermissionChecker.checkReadAuditLog();
     List<Filters.AppliedFilter> appliedFilters = resolveAppliedFilters(filterContext);
     String query = createCountQuery(filterContext, appliedFilters);
     try (Connection connection = database.getConnection(); PreparedStatement statement = connection.prepareStatement(query)) {

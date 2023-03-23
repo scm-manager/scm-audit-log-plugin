@@ -25,10 +25,12 @@
 package com.cloudogu.auditlog;
 
 import lombok.AllArgsConstructor;
+import org.apache.shiro.authz.AuthorizationException;
 import org.github.sdorra.jse.ShiroExtension;
 import org.github.sdorra.jse.SubjectAware;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -47,6 +49,7 @@ import java.util.Collection;
 
 import static java.util.Collections.emptySet;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static sonia.scm.repository.RepositoryTestData.create42Puzzle;
 import static sonia.scm.repository.RepositoryTestData.createHeartOfGold;
 
@@ -69,241 +72,252 @@ class DefaultAuditLogServiceTest {
   }
 
   @Test
-  void shouldGetEmptyStringIfNoEntries() {
-    Collection<LogEntry> entries = service.getEntries(new AuditLogFilterContext());
-
-    assertThat(entries).isEmpty();
+  void shouldNotReadAuditLogWithoutPermission() {
+    assertThrows(AuthorizationException.class, () -> service.getTotalEntries(new AuditLogFilterContext()));
+    assertThrows(AuthorizationException.class, () -> service.getEntries(new AuditLogFilterContext()));
   }
 
-  @Test
-  @SubjectAware(value = "trillian")
-  void shouldCreateNewEntryForModified() {
-    EntryCreationContext<Repository> creationContext = new EntryCreationContext<>(create42Puzzle(), createHeartOfGold());
-    service.createEntry(creationContext);
+  @Nested
+  @SubjectAware(permissions = "auditLog:read")
+  class WithReadPermission {
+    @Test
+    @SubjectAware("trillian")
+    void shouldGetEmptyStringIfNoEntries() {
+      Collection<LogEntry> entries = service.getEntries(new AuditLogFilterContext());
 
-    Collection<LogEntry> entries = service.getEntries(new AuditLogFilterContext());
+      assertThat(entries).isEmpty();
+    }
 
-    assertThat(entries).hasSize(1);
-    LogEntry entry = entries.iterator().next();
-    assertThat(entry.getAction()).isEqualTo("modified");
-    assertThat(entry.getUser()).isEqualTo("trillian");
-    assertThat(entry.getEntity()).isEqualTo("hitchhiker/42Puzzle");
-    assertThat(entry.getEntry()).contains("[MODIFIED] 'trillian' modified repository 'hitchhiker/42Puzzle'");
-  }
+    @Test
+    @SubjectAware(value = "trillian")
+    void shouldCreateNewEntryForModified() {
+      EntryCreationContext<Repository> creationContext = new EntryCreationContext<>(create42Puzzle(), createHeartOfGold());
+      service.createEntry(creationContext);
 
-  @Test
-  @SubjectAware(value = "trillian")
-  void shouldCreateNewEntryForCreated() {
-    EntryCreationContext<Repository> creationContext = new EntryCreationContext<>(create42Puzzle(), null);
-    service.createEntry(creationContext);
+      Collection<LogEntry> entries = service.getEntries(new AuditLogFilterContext());
 
-    Collection<LogEntry> entries = service.getEntries(new AuditLogFilterContext());
+      assertThat(entries).hasSize(1);
+      LogEntry entry = entries.iterator().next();
+      assertThat(entry.getAction()).isEqualTo("modified");
+      assertThat(entry.getUser()).isEqualTo("trillian");
+      assertThat(entry.getEntity()).isEqualTo("hitchhiker/42Puzzle");
+      assertThat(entry.getEntry()).contains("[MODIFIED] 'trillian' modified repository 'hitchhiker/42Puzzle'");
+    }
 
-    assertThat(entries).hasSize(1);
-    LogEntry entry = entries.iterator().next();
-    assertThat(entry.getAction()).isEqualTo("created");
-    assertThat(entry.getUser()).isEqualTo("trillian");
-    assertThat(entry.getEntity()).isEqualTo("hitchhiker/42Puzzle");
-    assertThat(entry.getEntry()).contains("[CREATED] 'trillian' created repository 'hitchhiker/42Puzzle'");
-  }
+    @Test
+    @SubjectAware(value = "trillian")
+    void shouldCreateNewEntryForCreated() {
+      EntryCreationContext<Repository> creationContext = new EntryCreationContext<>(create42Puzzle(), null);
+      service.createEntry(creationContext);
 
-  @Test
-  @SubjectAware(value = "trillian")
-  void shouldCreateNewEntryForDeleted() {
-    EntryCreationContext<Repository> creationContext = new EntryCreationContext<>(null, create42Puzzle());
-    service.createEntry(creationContext);
+      Collection<LogEntry> entries = service.getEntries(new AuditLogFilterContext());
 
-    Collection<LogEntry> entries = service.getEntries(new AuditLogFilterContext());
+      assertThat(entries).hasSize(1);
+      LogEntry entry = entries.iterator().next();
+      assertThat(entry.getAction()).isEqualTo("created");
+      assertThat(entry.getUser()).isEqualTo("trillian");
+      assertThat(entry.getEntity()).isEqualTo("hitchhiker/42Puzzle");
+      assertThat(entry.getEntry()).contains("[CREATED] 'trillian' created repository 'hitchhiker/42Puzzle'");
+    }
 
-    assertThat(entries).hasSize(1);
-    LogEntry entry = entries.iterator().next();
-    assertThat(entry.getAction()).isEqualTo("deleted");
-    assertThat(entry.getUser()).isEqualTo("trillian");
-    assertThat(entry.getEntity()).isEqualTo("hitchhiker/42Puzzle");
-    assertThat(entry.getEntry()).contains("[DELETED] 'trillian' deleted repository 'hitchhiker/42Puzzle'");
-  }
+    @Test
+    @SubjectAware(value = "trillian")
+    void shouldCreateNewEntryForDeleted() {
+      EntryCreationContext<Repository> creationContext = new EntryCreationContext<>(null, create42Puzzle());
+      service.createEntry(creationContext);
 
-  @Test
-  @SubjectAware(value = "trillian")
-  void shouldGetTotalEntries() {
-    EntryCreationContext<Repository> creationContext = new EntryCreationContext<>(null, create42Puzzle());
-    service.createEntry(creationContext);
-    service.createEntry(creationContext);
-    service.createEntry(creationContext);
-    service.createEntry(creationContext);
-    service.createEntry(creationContext);
-    service.createEntry(creationContext);
+      Collection<LogEntry> entries = service.getEntries(new AuditLogFilterContext());
 
-    int totalEntries = service.getTotalEntries(new AuditLogFilterContext());
+      assertThat(entries).hasSize(1);
+      LogEntry entry = entries.iterator().next();
+      assertThat(entry.getAction()).isEqualTo("deleted");
+      assertThat(entry.getUser()).isEqualTo("trillian");
+      assertThat(entry.getEntity()).isEqualTo("hitchhiker/42Puzzle");
+      assertThat(entry.getEntry()).contains("[DELETED] 'trillian' deleted repository 'hitchhiker/42Puzzle'");
+    }
 
-    assertThat(totalEntries).isEqualTo(6);
-  }
+    @Test
+    @SubjectAware(value = "trillian")
+    void shouldGetTotalEntries() {
+      EntryCreationContext<Repository> creationContext = new EntryCreationContext<>(null, create42Puzzle());
+      service.createEntry(creationContext);
+      service.createEntry(creationContext);
+      service.createEntry(creationContext);
+      service.createEntry(creationContext);
+      service.createEntry(creationContext);
+      service.createEntry(creationContext);
 
-  @Test
-  @SubjectAware(value = "trillian")
-  void shouldCreateEntryWithCorrectEntityName() {
-    EntryCreationContext<TestEntity> creationContext = new EntryCreationContext<>(new TestEntity("secret_name"), null);
+      int totalEntries = service.getTotalEntries(new AuditLogFilterContext());
 
-    service.createEntry(creationContext);
+      assertThat(totalEntries).isEqualTo(6);
+    }
 
-    Collection<LogEntry> entries = service.getEntries(new AuditLogFilterContext());
+    @Test
+    @SubjectAware(value = "trillian")
+    void shouldCreateEntryWithCorrectEntityName() {
+      EntryCreationContext<TestEntity> creationContext = new EntryCreationContext<>(new TestEntity("secret_name"), null);
 
-    LogEntry entry = entries.iterator().next();
-    assertThat(entry.getEntity()).isEqualTo("secret_name");
-  }
+      service.createEntry(creationContext);
 
-  @Test
-  @SubjectAware(value = "trillian")
-  void shouldCreateEntryWithoutEntityName() {
-    EntryCreationContext<WithoutAnnotation> creationContext = new EntryCreationContext<>(new WithoutAnnotation("secret_name"), null);
+      Collection<LogEntry> entries = service.getEntries(new AuditLogFilterContext());
 
-    service.createEntry(creationContext);
+      LogEntry entry = entries.iterator().next();
+      assertThat(entry.getEntity()).isEqualTo("secret_name");
+    }
 
-    Collection<LogEntry> entries = service.getEntries(new AuditLogFilterContext());
+    @Test
+    @SubjectAware(value = "trillian")
+    void shouldCreateEntryWithoutEntityName() {
+      EntryCreationContext<WithoutAnnotation> creationContext = new EntryCreationContext<>(new WithoutAnnotation("secret_name"), null);
 
-    LogEntry entry = entries.iterator().next();
-    assertThat(entry.getEntity()).isEmpty();
-  }
+      service.createEntry(creationContext);
 
-  @Test
-  @SubjectAware(value = "trillian")
-  void shouldCreateEntryWithExplicitEntityName() {
-    EntryCreationContext<WithoutAnnotation> creationContext = new EntryCreationContext<>(new WithoutAnnotation("secret_name"), null, "TRILLIAN", emptySet());
+      Collection<LogEntry> entries = service.getEntries(new AuditLogFilterContext());
 
-    service.createEntry(creationContext);
+      LogEntry entry = entries.iterator().next();
+      assertThat(entry.getEntity()).isEmpty();
+    }
 
-    Collection<LogEntry> entries = service.getEntries(new AuditLogFilterContext());
+    @Test
+    @SubjectAware(value = "trillian")
+    void shouldCreateEntryWithExplicitEntityName() {
+      EntryCreationContext<WithoutAnnotation> creationContext = new EntryCreationContext<>(new WithoutAnnotation("secret_name"), null, "TRILLIAN", emptySet());
 
-    LogEntry entry = entries.iterator().next();
-    assertThat(entry.getEntity()).isEqualTo("TRILLIAN");
-  }
+      service.createEntry(creationContext);
 
-  @Test
-  @SubjectAware
-  void shouldCreateEntryForServerContext() {
-    EntryCreationContext<TestEntity> creationContext = new EntryCreationContext<>(new TestEntity("secret_name"), null);
+      Collection<LogEntry> entries = service.getEntries(new AuditLogFilterContext());
 
-    service.createEntry(creationContext);
+      LogEntry entry = entries.iterator().next();
+      assertThat(entry.getEntity()).isEqualTo("TRILLIAN");
+    }
 
-    Collection<LogEntry> entries = service.getEntries(new AuditLogFilterContext());
+    @Test
+    @SubjectAware
+    void shouldCreateEntryForServerContext() {
+      EntryCreationContext<TestEntity> creationContext = new EntryCreationContext<>(new TestEntity("secret_name"), null);
 
-    LogEntry entry = entries.iterator().next();
-    assertThat(entry.getUser()).isNull();
-  }
+      service.createEntry(creationContext);
 
-  @Test
-  @SubjectAware(value = "trillian")
-  void shouldGetEntriesByEntityFilter() {
-    prepareDbEntries();
+      Collection<LogEntry> entries = service.getLogEntries(new AuditLogFilterContext());
 
-    AuditLogFilterContext filter = new AuditLogFilterContext();
-    filter.setEntity("TRILLIAN");
-    Collection<LogEntry> entries = service.getEntries(filter);
+      LogEntry entry = entries.iterator().next();
+      assertThat(entry.getUser()).isNull();
+    }
 
-    assertThat(entries).hasSize(1);
-  }
+    @Test
+    @SubjectAware(value = "trillian")
+    void shouldGetEntriesByEntityFilter() {
+      prepareDbEntries();
 
-  @Test
-  @SubjectAware(value = "trillian")
-  void shouldGetEntriesByLabelFilter() {
-    prepareDbEntries();
+      AuditLogFilterContext filter = new AuditLogFilterContext();
+      filter.setEntity("TRILLIAN");
+      Collection<LogEntry> entries = service.getEntries(filter);
 
-    AuditLogFilterContext filter = new AuditLogFilterContext();
-    filter.setLabel("object");
-    Collection<LogEntry> entries = service.getEntries(filter);
+      assertThat(entries).hasSize(1);
+    }
 
-    assertThat(entries).hasSize(1);
-    LogEntry entry = entries.iterator().next();
-    assertThat(entry.getEntity()).isEqualTo("TRILLIAN");
-  }
+    @Test
+    @SubjectAware(value = "trillian")
+    void shouldGetEntriesByLabelFilter() {
+      prepareDbEntries();
 
-  @Test
-  @SubjectAware(value = "trillian")
-  void shouldGetEntriesByUsernameFilter() {
-    EntryCreationContext<?> creationContext = new EntryCreationContext<>(new TestEntity("entity"), null, "TRILLIAN", emptySet());
-    service.createEntry(creationContext);
+      AuditLogFilterContext filter = new AuditLogFilterContext();
+      filter.setLabel("object");
+      Collection<LogEntry> entries = service.getEntries(filter);
 
-    creationContext = new EntryCreationContext<>(new WithoutAnnotation("anno"), null, "DENT", emptySet());
-    service.createEntry(creationContext);
+      assertThat(entries).hasSize(1);
+      LogEntry entry = entries.iterator().next();
+      assertThat(entry.getEntity()).isEqualTo("TRILLIAN");
+    }
 
-    AuditLogFilterContext filter = new AuditLogFilterContext();
-    filter.setUsername("trillian");
-    Collection<LogEntry> entries = service.getEntries(filter);
+    @Test
+    @SubjectAware(value = "trillian")
+    void shouldGetEntriesByUsernameFilter() {
+      EntryCreationContext<?> creationContext = new EntryCreationContext<>(new TestEntity("entity"), null, "TRILLIAN", emptySet());
+      service.createEntry(creationContext);
 
-    assertThat(entries).hasSize(2);
-    LogEntry entry = entries.iterator().next();
-    assertThat(entry.getUser()).isEqualTo("trillian");
-  }
+      creationContext = new EntryCreationContext<>(new WithoutAnnotation("anno"), null, "DENT", emptySet());
+      service.createEntry(creationContext);
 
-  @Test
-  @SubjectAware(value = "trillian")
-  void shouldGetEntriesByFromDateFilter() {
-    prepareDbEntries();
+      AuditLogFilterContext filter = new AuditLogFilterContext();
+      filter.setUsername("trillian");
+      Collection<LogEntry> entries = service.getEntries(filter);
 
-    AuditLogFilterContext filter = new AuditLogFilterContext();
-    filter.setFrom(new Date(Instant.now().minus(5, ChronoUnit.DAYS).toEpochMilli()));
-    Collection<LogEntry> entries = service.getEntries(filter);
+      assertThat(entries).hasSize(2);
+      LogEntry entry = entries.iterator().next();
+      assertThat(entry.getUser()).isEqualTo("trillian");
+    }
 
-    assertThat(entries).hasSize(2);
-  }
+    @Test
+    @SubjectAware(value = "trillian")
+    void shouldGetEntriesByFromDateFilter() {
+      prepareDbEntries();
 
-  @Test
-  @SubjectAware(value = "trillian")
-  void shouldGetEntriesByToDateFilter() {
-    prepareDbEntries();
+      AuditLogFilterContext filter = new AuditLogFilterContext();
+      filter.setFrom(new Date(Instant.now().minus(5, ChronoUnit.DAYS).toEpochMilli()));
+      Collection<LogEntry> entries = service.getEntries(filter);
 
-    AuditLogFilterContext filter = new AuditLogFilterContext();
-    filter.setTo(new Date(Instant.now().plus(5, ChronoUnit.DAYS).toEpochMilli()));
-    Collection<LogEntry> entries = service.getEntries(filter);
+      assertThat(entries).hasSize(2);
+    }
 
-    assertThat(entries).hasSize(2);
-  }
+    @Test
+    @SubjectAware(value = "trillian")
+    void shouldGetEntriesByToDateFilter() {
+      prepareDbEntries();
 
-  @Test
-  @SubjectAware(value = "trillian")
-  void shouldGetEntriesByBothDateFilters() {
-    prepareDbEntries();
+      AuditLogFilterContext filter = new AuditLogFilterContext();
+      filter.setTo(new Date(Instant.now().plus(5, ChronoUnit.DAYS).toEpochMilli()));
+      Collection<LogEntry> entries = service.getEntries(filter);
 
-    AuditLogFilterContext filter = new AuditLogFilterContext();
-    filter.setFrom(new Date(Instant.now().minus(5, ChronoUnit.DAYS).toEpochMilli()));
-    filter.setTo(new Date(Instant.now().plus(5, ChronoUnit.DAYS).toEpochMilli()));
-    Collection<LogEntry> entries = service.getEntries(filter);
+      assertThat(entries).hasSize(2);
+    }
 
-    assertThat(entries).hasSize(2);
-  }
+    @Test
+    @SubjectAware(value = "trillian")
+    void shouldGetEntriesByBothDateFilters() {
+      prepareDbEntries();
 
-  @Test
-  @SubjectAware(value = "trillian")
-  void shouldGetEntriesWithActionFilter() {
-    prepareDbEntries();
+      AuditLogFilterContext filter = new AuditLogFilterContext();
+      filter.setFrom(new Date(Instant.now().minus(5, ChronoUnit.DAYS).toEpochMilli()));
+      filter.setTo(new Date(Instant.now().plus(5, ChronoUnit.DAYS).toEpochMilli()));
+      Collection<LogEntry> entries = service.getEntries(filter);
 
-    AuditLogFilterContext filter = new AuditLogFilterContext();
-    filter.setAction("modified");
-    Collection<LogEntry> entries = service.getEntries(filter);
+      assertThat(entries).hasSize(2);
+    }
 
-    assertThat(entries).hasSize(1);
-  }
+    @Test
+    @SubjectAware(value = "trillian")
+    void shouldGetEntriesWithActionFilter() {
+      prepareDbEntries();
 
-  @Test
-  @SubjectAware(value = "trillian")
-  void shouldGetEntriesWithAllFilters() {
-    prepareDbEntries();
+      AuditLogFilterContext filter = new AuditLogFilterContext();
+      filter.setAction("modified");
+      Collection<LogEntry> entries = service.getEntries(filter);
 
-    AuditLogFilterContext filter = new AuditLogFilterContext();
-    filter.setFrom(new Date(Instant.now().minus(5, ChronoUnit.DAYS).toEpochMilli()));
-    filter.setTo(new Date(Instant.now().plus(5, ChronoUnit.DAYS).toEpochMilli()));
-    filter.setUsername("trillian");
-    filter.setLabel("test");
-    filter.setEntity("TRILLIAN");
-    filter.setAction("modified");
-    Collection<LogEntry> entries = service.getEntries(filter);
+      assertThat(entries).hasSize(1);
+    }
 
-    assertThat(entries).hasSize(1);
-    LogEntry entry = entries.iterator().next();
+    @Test
+    @SubjectAware(value = "trillian")
+    void shouldGetEntriesWithAllFilters() {
+      prepareDbEntries();
 
-    assertThat(entry.getEntry()).contains("[MODIFIED] 'trillian' modified test object more \n" +
-      "Diff:\n" +
-      "  - 'name' changed: 'oldEntity' -> 'entity'");
+      AuditLogFilterContext filter = new AuditLogFilterContext();
+      filter.setFrom(new Date(Instant.now().minus(5, ChronoUnit.DAYS).toEpochMilli()));
+      filter.setTo(new Date(Instant.now().plus(5, ChronoUnit.DAYS).toEpochMilli()));
+      filter.setUsername("trillian");
+      filter.setLabel("test");
+      filter.setEntity("TRILLIAN");
+      filter.setAction("modified");
+      Collection<LogEntry> entries = service.getEntries(filter);
+
+      assertThat(entries).hasSize(1);
+      LogEntry entry = entries.iterator().next();
+
+      assertThat(entry.getEntry()).contains("[MODIFIED] 'trillian' modified test object more \n" +
+        "Diff:\n" +
+        "  - 'name' changed: 'oldEntity' -> 'entity'");
+    }
   }
 
   private void prepareDbEntries() {

@@ -33,4 +33,8 @@ class PermissionChecker {
   public static boolean mayReadAuditLog() {
     return SecurityUtils.getSubject().isPermitted("auditLog:read");
   }
+
+  public static void checkReadAuditLog() {
+    SecurityUtils.getSubject().checkPermission("auditLog:read");
+  }
 }

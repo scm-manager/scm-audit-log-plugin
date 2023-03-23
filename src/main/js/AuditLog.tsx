@@ -35,7 +35,7 @@ import {
 } from "@scm-manager/ui-components";
 import { Filters, useAuditLog } from "./useAuditLog";
 import { Redirect, useLocation, useRouteMatch } from "react-router-dom";
-import { Links } from "@scm-manager/ui-types";
+import { Link, Links } from "@scm-manager/ui-types";
 import { Button } from "@scm-manager/ui-buttons";
 import queryString from "query-string";
 import styled from "styled-components";
@@ -47,7 +47,30 @@ const FullWidthSelect = styled(Select)`
   }
 `;
 
-const AuditLog: FC<{ links: Links }> = () => {
+const ExportButton: FC<{ links: Links; filters: Filters }> = ({ links, filters }) => {
+  const [t] = useTranslation("plugins");
+  if (links.auditLogCsvExport) {
+    let link = (links.auditLogCsvExport as Link).href;
+    for (const filter of Object.entries(filters)) {
+      if (filter[1]) {
+        if (!link.includes("?")) {
+          link += "?";
+        } else {
+          link += "&";
+        }
+        link += `${filter[0]}=${filter[1]}`;
+      }
+    }
+    return (
+      <a className="button" download={"scm-audit-log_" + Date.now() + ".csv"} href={link}>
+        {t("scm-audit-log-plugin.filter.exportButton")}
+      </a>
+    );
+  }
+  return null;
+};
+
+const AuditLog: FC<{ links: Links }> = ({ links }) => {
   const [t] = useTranslation("plugins");
   const match = useRouteMatch();
   const page = urls.getPageFromMatch(match);
@@ -155,6 +178,9 @@ const AuditLog: FC<{ links: Links }> = () => {
       <Level
         right={
           <div className="buttons">
+            <Button variant="primary" onClick={() => setFilters({ entity, username, label, from, to, action })}>
+              {t("scm-audit-log-plugin.filter.applyButton")}
+            </Button>
             <Button
               onClick={() => {
                 setEntity("");
@@ -167,12 +193,11 @@ const AuditLog: FC<{ links: Links }> = () => {
             >
               {t("scm-audit-log-plugin.filter.resetButton")}
             </Button>
-            <Button variant="primary" onClick={() => setFilters({ entity, username, label, from, to, action })}>
-              {t("scm-audit-log-plugin.filter.applyButton")}
-            </Button>
           </div>
         }
       />
+      <hr />
+      <Level right={<ExportButton links={links} filters={filters} />} />
       <pre>{data?._embedded?.entries.map(e => e.entry + "\n")}</pre>
       <hr />
       <LinkPaginator collection={data} page={page} />

@@ -32,6 +32,7 @@ dependencies {
   // optionalPlugin "sonia.scm.plugins:scm-editor-plugin:2.0.0"
   implementation 'com.h2database:h2:2.1.214'
   implementation 'org.javers:javers-core:6.7.1'
+  implementation 'org.apache.commons:commons-csv:1.10.0'
 }
 
 scmPlugin {

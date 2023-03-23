@@ -33,6 +33,8 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVPrinter;
 import sonia.scm.api.v2.resources.ErrorDto;
 import sonia.scm.api.v2.resources.LinkBuilder;
 import sonia.scm.api.v2.resources.ScmPathInfoStore;
@@ -47,9 +49,11 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.StreamingOutput;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.EnumSet;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static com.damnhandy.uri.template.UriTemplate.fromTemplate;
 import static de.otto.edison.hal.Embedded.embeddedBuilder;
@@ -73,8 +77,57 @@ public class AuditLogResource {
   }
 
   @GET
+  @Produces("text/csv")
+  @Path("/export/csv")
+  @Operation(summary = "Get filtered audit log entries as csv", description = "Returns a pre-formatted csv of the filtered audit log entries.", tags = "Audit Log")
+  @ApiResponse(
+    responseCode = "200",
+    description = "success",
+    content = @Content(
+      mediaType = "text/csv"
+    )
+  )
+  @ApiResponse(responseCode = "401", description = "not authenticated / invalid credentials")
+  @ApiResponse(responseCode = "403", description = "not authorized, the current user does not have the \"auditLog:read\" privilege")
+  @ApiResponse(
+    responseCode = "500",
+    description = "internal server error",
+    content = @Content(
+      mediaType = VndMediaType.ERROR_TYPE,
+      schema = @Schema(implementation = ErrorDto.class)
+    )
+  )
+  public StreamingOutput exportAuditLogAsCsv(@DefaultValue("1") @QueryParam("pageNumber") int page,
+                                             @DefaultValue("999999999") @QueryParam("pageSize") int limit,
+                                             @QueryParam("entity") String entity,
+                                             @QueryParam("username") String username,
+                                             @QueryParam("from") String from,
+                                             @QueryParam("to") String to,
+                                             @QueryParam("label") String label,
+                                             @QueryParam("action") String action
+  ) {
+    return output -> {
+      try (PrintWriter out = new PrintWriter(output)) {
+        CSVFormat csvFormat = CSVFormat.DEFAULT.builder()
+          .setHeader("Timestamp", "Username", "Action", "Entity", "Diff")
+          .build();
+        CSVPrinter csvPrinter = new CSVPrinter(out, csvFormat);
+        auditLogService.getEntries(new AuditLogFilterContext(page, limit, entity, username, from, to, label, action))
+          .forEach(e -> {
+              try {
+                csvPrinter.printRecord(e.getTimestamp(), e.getUser(), e.getAction(), e.getEntity(), e.getEntry().replace("\n", " "));
+              } catch (IOException ex) {
+                throw new AuditLogException("Export as csv failed ", ex);
+              }
+            }
+          );
+      }
+    };
+  }
+
+  @GET
   @Produces(MediaType.TEXT_PLAIN)
-  @Path("")
+  @Path("/export/text-plain")
   @Operation(summary = "Get filtered audit log entries as text", description = "Returns a pre-formatted text of the filtered audit log entries.", tags = "Audit Log")
   @ApiResponse(
     responseCode = "200",
@@ -93,8 +146,8 @@ public class AuditLogResource {
       schema = @Schema(implementation = ErrorDto.class)
     )
   )
-  public String getAuditLog(@DefaultValue("1") @QueryParam("pageNumber") int page,
-                            @DefaultValue("100") @QueryParam("pageSize") int limit,
+  public StreamingOutput exportAuditLogWithLineBreak(@DefaultValue("1") @QueryParam("pageNumber") int page,
+                            @DefaultValue("999999999") @QueryParam("pageSize") int limit,
                             @QueryParam("entity") String entity,
                             @QueryParam("username") String username,
                             @QueryParam("from") String from,
@@ -102,15 +155,17 @@ public class AuditLogResource {
                             @QueryParam("label") String label,
                             @QueryParam("action") String action
   ) {
-    return auditLogService.getEntries(new AuditLogFilterContext(page, limit, entity, username, from, to, label, action))
-      .stream()
-      .map(LogEntry::getEntry)
-      .collect(Collectors.joining("\n"));
+    return output -> {
+      try (PrintWriter out = new PrintWriter(output)) {
+        auditLogService.getEntries(new AuditLogFilterContext(page, limit, entity, username, from, to, label, action))
+          .forEach(e -> out.println(e.getEntry()));
+      }
+    };
   }
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
-  @Path("paginated")
+  @Path("")
   @Operation(summary = "Get filtered audit log entries as json with pagination support", description = "Returns json with list of audit log entries.", tags = "Audit Log")
   @ApiResponse(
     responseCode = "200",

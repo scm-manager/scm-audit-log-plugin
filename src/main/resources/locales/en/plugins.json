@@ -28,7 +28,8 @@
         "helpText": "Type of action"
       },
       "applyButton": "Apply filter",
-      "resetButton": "Reset filter"
+      "resetButton": "Reset filter",
+      "exportButton": "Export as CSV"
     }
   },
   "permissions": {
