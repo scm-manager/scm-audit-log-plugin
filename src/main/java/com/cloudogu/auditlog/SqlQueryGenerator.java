@@ -35,7 +35,6 @@ public class SqlQueryGenerator {
   static String createEntriesQuery(AuditLogFilterContext filterContext, List<Filters.AppliedFilter> appliedFilters) {
     return "SELECT TIMESTAMP_,ENTITY,USERNAME,ACTION_,ENTRY FROM AUDITLOG " +
       createFilterQuery(filterContext, appliedFilters) +
-      "GROUP BY TIMESTAMP_,ENTITY,USERNAME,ACTION_,ENTRY " +
       "ORDER BY ID DESC " +
       "LIMIT " + filterContext.getLimit() + " " +
       "OFFSET " + (filterContext.getPageNumber() - 1) * filterContext.getLimit() + ";";

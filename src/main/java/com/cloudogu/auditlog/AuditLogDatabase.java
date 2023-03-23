@@ -48,7 +48,7 @@ class AuditLogDatabase implements ServletContextListener {
 
     try (Connection connection = dataSource.getConnection(); Statement statement = connection.createStatement()) {
       statement.execute("CREATE TABLE IF NOT EXISTS AUDITLOG(ID int auto_increment primary key, TIMESTAMP_ timestamp, ENTITY varchar, USERNAME varchar, ACTION_ varchar, ENTRY varchar);");
-      statement.execute("CREATE TABLE IF NOT EXISTS LABELS(AUDIT varchar, LABEL varchar);");
+      statement.execute("CREATE TABLE IF NOT EXISTS LABELS(AUDIT int, LABEL varchar);");
     }
   }
 

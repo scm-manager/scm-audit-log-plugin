@@ -44,8 +44,6 @@ public class Filters {
     } else {
       StringBuilder builder = new StringBuilder();
       builder
-        .append("LEFT OUTER JOIN LABELS ")
-        .append("ON AUDITLOG.ID = LABELS.AUDIT ")
         .append("WHERE TRUE ");
 
       appliedFilters
@@ -71,7 +69,7 @@ public class Filters {
       appliedFilters.add(new AppliedFilter("AND AUDITLOG.USERNAME = ? ", filterContext.getUsername()));
     }
     if (filterContext.getLabel() != null) {
-      appliedFilters.add(new AppliedFilter("AND LABELS.LABEL = ? ", filterContext.getLabel()));
+      appliedFilters.add(new AppliedFilter("AND AUDITLOG.ID IN (SELECT LABELS.AUDIT FROM LABELS WHERE LABELS.LABEL = ?) ", filterContext.getLabel()));
     }
     if (filterContext.getAction() != null) {
       appliedFilters.add(new AppliedFilter("AND AUDITLOG.ACTION_ = ? ", filterContext.getAction()));
