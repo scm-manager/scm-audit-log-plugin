@@ -28,6 +28,9 @@ import React, { FC } from "react";
 import { Route, Switch } from "react-router-dom";
 import AuditLogNavigation from "./AuditLogNavigation";
 import AuditLog from "./AuditLog";
+import RepositoryAuditLogLink from "./RepositoryAuditLogLink";
+import UserAuditLogLink from "./UserAuditLogLink";
+import GroupAuditLogLink from "./GroupAuditLogLink";
 
 type PredicateProps = {
   links: Links;
@@ -52,3 +55,6 @@ const AuditLogRoute: FC<{ links: Links }> = ({ links }) => {
 
 binder.bind<extensionPoints.AdminRoute>("admin.route", AuditLogRoute, predicate);
 binder.bind<extensionPoints.AdminNavigation>("admin.navigation", AuditLogNavigation, predicate);
+binder.bind<extensionPoints.RepositoryInformationTableBottom>("repository.information.table.bottom", RepositoryAuditLogLink);
+binder.bind<extensionPoints.UserInformationTableBottom>("user.information.table.bottom", UserAuditLogLink);
+binder.bind<extensionPoints.GroupInformationTableBottom>("group.information.table.bottom", GroupAuditLogLink);

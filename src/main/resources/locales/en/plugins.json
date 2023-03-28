@@ -2,6 +2,18 @@
   "scm-audit-log-plugin": {
     "title": "Audit Log",
     "navLink": "Audit Log",
+    "repository": {
+      "key": "Audit Log",
+      "link": "Open for repository"
+    },
+    "user": {
+      "key": "Audit Log",
+      "link": "Open for user"
+    },
+    "group": {
+      "key": "Audit Log",
+      "link": "Open for group"
+    },
     "filter": {
       "entity": {
         "label": "Entity name",
