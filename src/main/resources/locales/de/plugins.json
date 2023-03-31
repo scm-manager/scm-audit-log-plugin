@@ -16,28 +16,28 @@
     },
     "filter": {
       "entity": {
-        "label": "Name der Entität",
-        "helpText": "Name der bezogenen Entität, z. B. Repository-Name"
+        "label": "Name",
+        "helpText": "Name des veränderten Objekts, z.B. Name eines Repositories oder Name einer Gruppe. Dieser Filter ist unabhängig von Groß- und Kleinschreibung. Sie können das '*'-Symbol als Wildcard nutzen, um z.B. durch 'namespace/*' alle Repositories in einem 'namespace' genannten Namespace zu selektieren oder mit '*admin' alle Objekte, deren Name auf 'admin' enden."
       },
       "username": {
         "label": "Benutzername",
-        "helpText": "Name der ausführenden Benutzers"
+        "helpText": "Nutzer, der die Veränderung ausgelöst hat. Dieser Filter ist unabhängig von Groß- und Kleinschreibung. Sie können das '*'-Symbol als Wildcard nutzen, um z.B. durch 'admin*' alle Nutzer zu wählen, die mit dem Bestandteil 'admin' beginnen."
       },
       "label": {
-        "label": "Label",
-        "helpText": "Label für die Kategorie der Änderung"
+        "label": "Kategorie",
+        "helpText": "Kategorie der Änderung"
       },
       "from": {
-        "label": "Seit",
-        "helpText": "Einschließliches Datum ab dem gefiltert wird"
+        "label": "Startdatum",
+        "helpText": "Einträge ab (einschließlich) dem gewählten Datum"
       },
       "to": {
-        "label": "Bis",
-        "helpText": "Einschließliches Datum bis zu dem gefiltert wird"
+        "label": "Enddatum",
+        "helpText": "Einträge bis (einschließlich) zum gewählten Datum"
       },
       "action": {
         "label": "Aktion",
-        "helpText": "Art der Aktion"
+        "helpText": "Art der Veränderung"
       },
       "applyButton": "Filter anwenden",
       "resetButton": "Filter zurücksetzen",

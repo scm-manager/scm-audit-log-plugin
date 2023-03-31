@@ -16,24 +16,24 @@
     },
     "filter": {
       "entity": {
-        "label": "Entity name",
-        "helpText": "Name of the related entity, e.g. repository name"
+        "label": "Name",
+        "helpText": "Name of the changed object, e.g. name of a repository or name of a group. This filter is case-insensitive. You may use the '*' as a wildcard, e.g. to select all repositories from a namespace called 'namespace' with 'namespace/*' or '*admin' to select all objects that end on 'admin'. "
       },
       "username": {
         "label": "Username",
-        "helpText": "Name of the changing user"
+        "helpText": "User who triggered the change. This filter is case-insensitive. You may use the '*' as a wildcard, e.g. to select any user beginning with admin using 'admin*'."
       },
       "label": {
-        "label": "Label",
-        "helpText": "Label for the category of the change"
+        "label": "Category",
+        "helpText": "Category of change"
       },
       "from": {
-        "label": "From",
-        "helpText": "Including date from which filtering is performed"
+        "label": "Startdate",
+        "helpText": "Entries from (including) the chosen date"
       },
       "to": {
-        "label": "To",
-        "helpText": "Including date up to which filtering is performed"
+        "label": "Enddate",
+        "helpText": "Entries until (including) the chosen date"
       },
       "action": {
         "label": "Action",

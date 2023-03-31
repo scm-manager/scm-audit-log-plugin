@@ -46,6 +46,7 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Collection;
+import java.util.Set;
 
 import static java.util.Collections.emptySet;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -100,7 +101,7 @@ class DefaultAuditLogServiceTest {
       LogEntry entry = entries.iterator().next();
       assertThat(entry.getAction()).isEqualTo("modified");
       assertThat(entry.getUser()).isEqualTo("trillian");
-      assertThat(entry.getEntity()).isEqualTo("hitchhiker/42Puzzle");
+      assertThat(entry.getEntity()).isEqualTo("hitchhiker/42puzzle");
       assertThat(entry.getEntry()).contains("[MODIFIED] 'trillian' modified repository 'hitchhiker/42Puzzle'");
     }
 
@@ -116,7 +117,7 @@ class DefaultAuditLogServiceTest {
       LogEntry entry = entries.iterator().next();
       assertThat(entry.getAction()).isEqualTo("created");
       assertThat(entry.getUser()).isEqualTo("trillian");
-      assertThat(entry.getEntity()).isEqualTo("hitchhiker/42Puzzle");
+      assertThat(entry.getEntity()).isEqualTo("hitchhiker/42puzzle");
       assertThat(entry.getEntry()).contains("[CREATED] 'trillian' created repository 'hitchhiker/42Puzzle'");
     }
 
@@ -132,7 +133,7 @@ class DefaultAuditLogServiceTest {
       LogEntry entry = entries.iterator().next();
       assertThat(entry.getAction()).isEqualTo("deleted");
       assertThat(entry.getUser()).isEqualTo("trillian");
-      assertThat(entry.getEntity()).isEqualTo("hitchhiker/42Puzzle");
+      assertThat(entry.getEntity()).isEqualTo("hitchhiker/42puzzle");
       assertThat(entry.getEntry()).contains("[DELETED] 'trillian' deleted repository 'hitchhiker/42Puzzle'");
     }
 
@@ -188,7 +189,7 @@ class DefaultAuditLogServiceTest {
       Collection<LogEntry> entries = service.getEntries(new AuditLogFilterContext());
 
       LogEntry entry = entries.iterator().next();
-      assertThat(entry.getEntity()).isEqualTo("TRILLIAN");
+      assertThat(entry.getEntity()).isEqualTo("trillian");
     }
 
     @Test
@@ -202,6 +203,23 @@ class DefaultAuditLogServiceTest {
 
       LogEntry entry = entries.iterator().next();
       assertThat(entry.getUser()).isNull();
+    }
+
+    @Test
+    @SubjectAware("TrillIAN")
+    void shouldCreateFilterableFieldsForNewEntriesAllLowerCase() {
+      EntryCreationContext<TestEntity> creationContext = new EntryCreationContext<>(new TestEntity("SEcreT"), null, Set.of("ONlyLowerCase"));
+
+      service.createEntry(creationContext);
+
+      Collection<LogEntry> entries = service.getLogEntries(new AuditLogFilterContext());
+
+      LogEntry entry = entries.iterator().next();
+      assertThat(entry.getUser()).isEqualTo("trillian");
+      assertThat(entry.getEntity()).isEqualTo("secret");
+      assertThat(entry.getAction()).isEqualTo("created");
+
+      assertThat(service.getLabels()).contains("onlylowercase");
     }
 
     @Test
@@ -227,7 +245,7 @@ class DefaultAuditLogServiceTest {
 
       assertThat(entries).hasSize(1);
       LogEntry entry = entries.iterator().next();
-      assertThat(entry.getEntity()).isEqualTo("TRILLIAN");
+      assertThat(entry.getEntity()).isEqualTo("trillian");
     }
 
     @Test

@@ -63,19 +63,23 @@ public class Filters {
       appliedFilters.add(new AppliedFilter("AND AUDITLOG.TIMESTAMP_ <= ? ", filterContext.getTo().toString()));
     }
     if (filterContext.getEntity() != null) {
-      appliedFilters.add(new AppliedFilter("AND AUDITLOG.ENTITY = ? ", filterContext.getEntity()));
+      appliedFilters.add(new AppliedFilter("AND AUDITLOG.ENTITY LIKE ? ", normalizeValue(filterContext.getEntity())));
     }
     if (filterContext.getUsername() != null) {
-      appliedFilters.add(new AppliedFilter("AND AUDITLOG.USERNAME = ? ", filterContext.getUsername()));
+      appliedFilters.add(new AppliedFilter("AND AUDITLOG.USERNAME LIKE ? ", normalizeValue(filterContext.getUsername())));
     }
     if (filterContext.getLabel() != null) {
-      appliedFilters.add(new AppliedFilter("AND AUDITLOG.ID IN (SELECT LABELS.AUDIT FROM LABELS WHERE LABELS.LABEL = ?) ", filterContext.getLabel()));
+      appliedFilters.add(new AppliedFilter("AND AUDITLOG.ID IN (SELECT LABELS.AUDIT FROM LABELS WHERE LABELS.LABEL = ?) ", normalizeValue(filterContext.getLabel())));
     }
     if (filterContext.getAction() != null) {
-      appliedFilters.add(new AppliedFilter("AND AUDITLOG.ACTION_ = ? ", filterContext.getAction()));
+      appliedFilters.add(new AppliedFilter("AND AUDITLOG.ACTION_ = ? ", normalizeValue(filterContext.getAction())));
     }
 
     return appliedFilters;
+  }
+
+  private static String normalizeValue(String value) {
+    return value.toLowerCase().replace("*", "%");
   }
 
   static void setFilterValues(PreparedStatement statement, List<AppliedFilter> appliedFilters) throws SQLException {

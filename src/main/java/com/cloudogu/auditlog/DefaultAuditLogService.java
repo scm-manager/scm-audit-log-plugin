@@ -107,9 +107,9 @@ public class DefaultAuditLogService implements AuditLogService {
       Statement.RETURN_GENERATED_KEYS)
     ) {
       statement.setTimestamp(1, new Timestamp(timestamp.toEpochMilli()));
-      statement.setString(2, entityName);
-      statement.setString(3, username);
-      statement.setString(4, action);
+      statement.setString(2, entityName.toLowerCase());
+      statement.setString(3, !Strings.isNullOrEmpty(username) ? username.toLowerCase() : username);
+      statement.setString(4, action.toLowerCase());
       if (!Strings.isNullOrEmpty(entry)) {
         statement.setString(5, entry);
         statement.executeUpdate();
@@ -189,7 +189,7 @@ public class DefaultAuditLogService implements AuditLogService {
          PreparedStatement statement = connection.prepareStatement("INSERT INTO LABELS(AUDIT, LABEL) VALUES (?, ?)")) {
       for (String label : labels) {
         statement.setInt(1, id);
-        statement.setString(2, label);
+        statement.setString(2, label.toLowerCase());
         statement.executeUpdate();
       }
     }
