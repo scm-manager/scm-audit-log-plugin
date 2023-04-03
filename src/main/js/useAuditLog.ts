@@ -44,7 +44,14 @@ type AuditLog = HalRepresentationWithEmbedded<AuditLogEntries> & {
   pageTotal: number;
 };
 
-export type Filters = Record<string, string>;
+export type Filters = {
+  entity: string;
+  username: string;
+  label: string;
+  action: string;
+  from: string;
+  to: string;
+};
 
 export const useAuditLog = (pageNumber: number, filters: Filters): ApiResult<AuditLog> => {
   const indexLink = useRequiredIndexLink("auditLog");
