@@ -27,16 +27,13 @@ plugins {
 }
 
 dependencies {
-  // define dependencies to other plugins here e.g.:
-  // plugin "sonia.scm.plugins:scm-mail-plugin:2.1.0"
-  // optionalPlugin "sonia.scm.plugins:scm-editor-plugin:2.0.0"
   implementation 'com.h2database:h2:2.1.214'
   implementation 'org.javers:javers-core:6.7.1'
   implementation 'org.apache.commons:commons-csv:1.10.0'
 }
 
 scmPlugin {
-  scmVersion = "2.42.4-SNAPSHOT"
+  scmVersion = "2.43.0"
   displayName = "Audit Log"
   description = "Logs various actions on your server"
   author = "Cloudogu GmbH"
