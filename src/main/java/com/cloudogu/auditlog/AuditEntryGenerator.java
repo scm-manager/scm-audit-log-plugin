@@ -29,6 +29,7 @@ import org.javers.common.string.PrettyValuePrinter;
 import org.javers.core.ChangesByObject;
 import org.javers.core.Javers;
 import org.javers.core.JaversBuilder;
+import org.javers.core.diff.changetype.PropertyChange;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import sonia.scm.auditlog.AuditEntry;
@@ -37,16 +38,30 @@ import sonia.scm.xml.XmlCipherStringAdapter;
 import sonia.scm.xml.XmlEncryptionAdapter;
 
 import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 
 import static com.cloudogu.auditlog.EntryContextResolver.resolveAction;
 
 public class AuditEntryGenerator {
+
+  private static final List<String> AUTOMASKED_FIELD_NAMES = List.of(
+    "password",
+    "pw",
+    "pwd",
+    "token",
+    "secret",
+    "key",
+    "private"
+  );
+
+  private static final AuditEntry DEFAULT_AUDIT_ENTRY = getDefaultAuditEntry();
 
   private static final Logger LOG = LoggerFactory.getLogger(AuditEntryGenerator.class);
 
@@ -56,6 +71,41 @@ public class AuditEntryGenerator {
   private static final String GROUP_LABEL = "group";
   private static final PrettyValuePrinter PRETTY_VALUE_PRINTER = PrettyValuePrinter.getDefault();
   private final Javers javers = JaversBuilder.javers().build();
+
+  private static AuditEntry getDefaultAuditEntry() {
+    return new AuditEntry() {
+
+      @Override
+      public Class<? extends Annotation> annotationType() {
+        return AuditEntry.class;
+      }
+
+      @Override
+      public String[] labels() {
+        return new String[0];
+      }
+
+      @Override
+      public String[] maskedFields() {
+        return new String[0];
+      }
+
+      @Override
+      public String[] ignoredFields() {
+        return new String[0];
+      }
+
+      @Override
+      public boolean ignore() {
+        return false;
+      }
+
+      @Override
+      public boolean autoMask() {
+        return true;
+      }
+    };
+  }
 
   <T> String generate(EntryCreationContext<T> context, Instant timestamp, String username, String action, String entityName, String[] labels) {
     StringBuilder builder = new StringBuilder()
@@ -97,20 +147,9 @@ public class AuditEntryGenerator {
   }
 
   private <T> void handleDiff(EntryCreationContext<T> context, StringBuilder builder) {
-    T object = getObject(context);
     List<ChangesByObject> changes = javers.compare(context.getOldObject(), context.getObject()).groupByObject();
-    String[] ignoredFields;
-    String[] maskedFields;
-    AuditEntry annotation = object.getClass().getAnnotation(AuditEntry.class);
-    if (annotation != null) {
-      ignoredFields = annotation.ignoredFields();
-      maskedFields = annotation.maskedFields();
-    } else {
-      ignoredFields = new String[]{};
-      maskedFields = new String[]{};
-    }
 
-    if (hasOnlyIgnoredFieldsChanged(changes, ignoredFields)) {
+    if (hasOnlyIgnoredFieldsChanged(changes)) {
       builder.setLength(0);
       return;
     }
@@ -119,13 +158,13 @@ public class AuditEntryGenerator {
 
     changes.forEach(it ->
       it.getPropertyChanges().forEach(c -> {
-          if (shouldMaskChange(object, maskedFields, c.getPropertyName())) {
+          if (shouldMaskChange(c) || shouldAutoMaskChange(c)) {
             if (resolveAction(context).equals("modified")) {
-              builder.append("  - '").append(c.getPropertyName()).append("' changed: ").append("********").append("\n");
+              builder.append("  - '").append(c.getPropertyNameWithPath()).append("' changed: ").append("********").append("\n");
             } else {
-              builder.append("  - '").append(c.getPropertyName()).append("' = ").append("********").append("\n");
+              builder.append("  - '").append(c.getPropertyNameWithPath()).append("' = ").append("********").append("\n");
             }
-          } else if (!shouldIgnoreField(ignoredFields, c.getPropertyName())) {
+          } else if (!shouldIgnoreField(c)) {
             builder.append("  - ").append(c.prettyPrint(PRETTY_VALUE_PRINTER).replace("\n", "\n  ")).append("\n");
           }
         }
@@ -133,36 +172,57 @@ public class AuditEntryGenerator {
     );
   }
 
-  <T> T getObject(EntryCreationContext<T> context) {
-    return context.getObject() != null ? context.getObject() : context.getOldObject();
+  private boolean hasOnlyIgnoredFieldsChanged(List<ChangesByObject> changes) {
+    for(ChangesByObject changesByObject : changes) {
+      for(PropertyChange changedProperty : changesByObject.getPropertyChanges()) {
+        List<String> ignoredFields = List.of(getAuditEntryAnnotation(changedProperty).ignoredFields());
+
+        if(!ignoredFields.contains(changedProperty.getPropertyName())) {
+          return false;
+        }
+      }
+    }
+
+    return true;
   }
 
-  private boolean hasOnlyIgnoredFieldsChanged(List<ChangesByObject> changes, String[] ignoredFields) {
-    HashSet<String> changedFields = new HashSet<>();
-    changes.forEach(c -> c.getPropertyChanges().forEach(d -> changedFields.add(d.getPropertyName())));
-    Arrays.asList(ignoredFields).forEach(changedFields::remove);
+  private AuditEntry getAuditEntryAnnotation(PropertyChange change) {
+    Optional<Object> changedObject = change.getAffectedObject();
 
-    return changedFields.isEmpty();
+    if(changedObject.isEmpty()) {
+      return DEFAULT_AUDIT_ENTRY;
+    }
 
+    AuditEntry annotation = changedObject.get().getClass().getAnnotation(AuditEntry.class);
+    if(annotation == null) {
+      return DEFAULT_AUDIT_ENTRY;
+    }
+
+    return annotation;
   }
 
-  private boolean shouldIgnoreField(String[] ignoredFields, String fieldName) {
-    return Arrays.asList(ignoredFields).contains(fieldName);
-  }
+  private <T> boolean shouldMaskChange(PropertyChange<T> change) {
+    AuditEntry annotation = getAuditEntryAnnotation(change);
 
-  private <T> boolean shouldMaskChange(T object, String[] maskedFields, String fieldName) {
-    if (Arrays.asList(maskedFields).contains(fieldName)) {
+    if (Arrays.asList(annotation.maskedFields()).contains(change.getPropertyName())) {
       return true;
     } else {
       try {
-        XmlJavaTypeAdapter adapterClass = findField(object.getClass(), fieldName).getAnnotation(XmlJavaTypeAdapter.class);
+        Optional<Object> changedObject = change.getAffectedObject();
+        if(changedObject.isEmpty()) {
+          return false;
+        }
+
+        XmlJavaTypeAdapter adapterClass = findField(changedObject.get().getClass(), change.getPropertyName()).getAnnotation(XmlJavaTypeAdapter.class);
+
         if (adapterClass != null) {
           return adapterClass.value().isAssignableFrom(XmlCipherStringAdapter.class) || adapterClass.value().isAssignableFrom(XmlEncryptionAdapter.class);
         }
       } catch (NoSuchFieldException e) {
-        LOG.debug("Could not resolve annotation for field " + fieldName, e);
+        LOG.debug("Could not resolve annotation for field " + change.getPropertyName(), e);
       }
     }
+
     return false;
   }
 
@@ -175,5 +235,26 @@ public class AuditEntryGenerator {
       }
       throw e;
     }
+  }
+
+  private <T> boolean shouldAutoMaskChange(PropertyChange<T> change) {
+    AuditEntry annotation = getAuditEntryAnnotation(change);
+
+    if(!annotation.autoMask()) {
+      return false;
+    }
+
+    for(String maskedFieldName : AUTOMASKED_FIELD_NAMES) {
+      if(change.getPropertyName().toLowerCase().contains(maskedFieldName)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private boolean shouldIgnoreField(PropertyChange change) {
+    AuditEntry annotation = getAuditEntryAnnotation(change);
+    return Arrays.asList(annotation.ignoredFields()).contains(change.getPropertyName());
   }
 }

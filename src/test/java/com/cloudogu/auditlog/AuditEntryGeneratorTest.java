@@ -39,6 +39,7 @@ import sonia.scm.xml.XmlEncryptionAdapter;
 
 import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 import java.time.Instant;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -200,6 +201,128 @@ class AuditEntryGeneratorTest {
     assertThat(entry).contains("'token' = ********");
   }
 
+  @Test
+  void shouldNotAutoMaskFields() {
+    String entry = generator.generate(
+      new EntryCreationContext<>(new DoNotAutoMaskFields("UserPassword", "pW", "adminPWD", "apiTokens", "otherSeCrEtLocal", "apiKey", "privateRSA"), null),
+      Instant.ofEpochSecond(1700000000),
+      "trillian",
+      "modified",
+      "",
+      new String[]{});
+
+    assertThat(entry).contains("'UserPassword' = 'UserPassword'");
+    assertThat(entry).contains("'pW' = 'pW'");
+    assertThat(entry).contains("'adminPWD' = 'adminPWD'");
+    assertThat(entry).contains("'apiTokens' = 'apiTokens'");
+    assertThat(entry).contains("'otherSeCrEtLocal' = 'otherSeCrEtLocal'");
+    assertThat(entry).contains("'apiKey' = 'apiKey'");
+    assertThat(entry).contains("'privateRSA' = 'privateRSA'");
+  }
+
+  @Test
+  void shouldAutoMaskFields() {
+    String entry = generator.generate(
+      new EntryCreationContext<>(new DoAutoMaskFields("UserPassword", "pW", "adminPWD", "apiTokens", "otherSeCrEtLocal", "apiKey", "privateRSA"), null),
+      Instant.ofEpochSecond(1700000000),
+      "trillian",
+      "modified",
+      "",
+      new String[]{});
+
+    assertThat(entry).doesNotContain("'UserPassword' = 'UserPassword'");
+    assertThat(entry).contains("'UserPassword' = ********");
+
+    assertThat(entry).doesNotContain("'pW' = 'pW'");
+    assertThat(entry).contains("'pW' = ********");
+
+    assertThat(entry).doesNotContain("'adminPWD' = 'adminPWD'");
+    assertThat(entry).contains("'adminPWD' = ********");
+
+    assertThat(entry).doesNotContain("'apiTokens' = 'apiTokens'");
+    assertThat(entry).contains("'apiTokens' = ********");
+
+    assertThat(entry).doesNotContain("'otherSeCrEtLocal' = 'otherSeCrEtLocal'");
+    assertThat(entry).contains("'otherSeCrEtLocal' = ********");
+
+    assertThat(entry).doesNotContain("'apiKey' = 'apiKey'");
+    assertThat(entry).contains("'apiKey' = ********");
+
+    assertThat(entry).doesNotContain("'privateRSA' = 'privateRSA'");
+    assertThat(entry).contains("'privateRSA' = ********");
+  }
+
+  @Test
+  void shouldApplyAnnotationsOfSubObject() {
+    Subfields subfields = new Subfields("shouldMask", "shouldIgnore", "passwordAutoMask");
+    String entry = generator.generate(
+      new EntryCreationContext<>(
+        new RootFields(subfields, List.of(subfields)),
+        null
+      ),
+      Instant.ofEpochSecond(1700000000),
+      "trillian",
+      "modified",
+      "",
+      new String[]{});
+
+    assertThat(entry).doesNotContain("shouldIgnore");
+
+    assertThat(entry).doesNotContain("'subfields.shouldMask' = 'shouldMask'");
+    assertThat(entry).contains("'subfields.shouldMask' = ********");
+
+    assertThat(entry).doesNotContain("'subfields.passwordAutoMask' = 'passwordAutoMask'");
+    assertThat(entry).contains("'subfields.passwordAutoMask' = ********");
+
+    assertThat(entry).doesNotContain("'subfieldsCollection/0.shouldMask' = 'shouldMask'");
+    assertThat(entry).contains("'subfieldsCollection/0.shouldMask' = ********");
+
+    assertThat(entry).doesNotContain("'subfieldsCollection/0.passwordAutoMask' = 'passwordAutoMask'");
+    assertThat(entry).contains("'subfieldsCollection/0.passwordAutoMask' = ********");
+  }
+
+}
+
+@Getter
+@AllArgsConstructor
+class RootFields {
+  private Subfields subfields;
+  private List<Subfields> subfieldsCollection;
+}
+
+@Getter
+@AllArgsConstructor
+@AuditEntry(maskedFields = "shouldMask", ignoredFields = "shouldIgnore", autoMask = true)
+class Subfields {
+  private String shouldMask;
+  private String shouldIgnore;
+  private String passwordAutoMask;
+}
+
+@Getter
+@AllArgsConstructor
+@AuditEntry(autoMask = false)
+class DoNotAutoMaskFields {
+  private String UserPassword;
+  private String pW;
+  private String adminPWD;
+  private String apiTokens;
+  private String otherSeCrEtLocal;
+  private String apiKey;
+  private String privateRSA;
+}
+
+@Getter
+@AllArgsConstructor
+@AuditEntry
+class DoAutoMaskFields {
+  private String UserPassword;
+  private String pW;
+  private String adminPWD;
+  private String apiTokens;
+  private String otherSeCrEtLocal;
+  private String apiKey;
+  private String privateRSA;
 }
 
 @AllArgsConstructor

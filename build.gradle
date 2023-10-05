@@ -33,7 +33,7 @@ dependencies {
 }
 
 scmPlugin {
-  scmVersion = "2.43.0"
+  scmVersion = "2.46.2-SNAPSHOT"
   displayName = "Audit Log"
   description = "Logs various actions on your server"
   author = "Cloudogu GmbH"
