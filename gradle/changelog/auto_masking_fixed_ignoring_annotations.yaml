@@ -1,4 +1,0 @@
-- type: added
-  description: Secrets also get masked, if the corresponding fields contains certain phrases
-- type: fixed
-  description: Audit configuration of objects will now always apply
