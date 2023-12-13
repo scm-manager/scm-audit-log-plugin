@@ -32,7 +32,7 @@ const AuditLogNavigation: FC = () => {
 
   const matchesAuditLog = (route: any) => {
     const regex = /\/admin\/audit-log\/.+/;
-    return route.location.pathname.match(regex);
+    return !!route.location.pathname.match(regex);
   };
 
   return (
