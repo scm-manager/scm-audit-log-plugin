@@ -16,7 +16,9 @@
 
 package com.cloudogu.auditlog;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
+import jakarta.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 import org.javers.common.string.PrettyValuePrinter;
 import org.javers.core.ChangesByObject;
 import org.javers.core.Javers;
@@ -29,10 +31,10 @@ import sonia.scm.auditlog.EntryCreationContext;
 import sonia.scm.xml.XmlCipherStringAdapter;
 import sonia.scm.xml.XmlEncryptionAdapter;
 
-import jakarta.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.List;
@@ -62,6 +64,16 @@ public class AuditEntryGenerator {
   private static final String GROUP_LABEL = "group";
   private static final PrettyValuePrinter PRETTY_VALUE_PRINTER = PrettyValuePrinter.getDefault();
   private final Javers javers = JaversBuilder.javers().build();
+  private final ZoneId zoneId;
+
+  AuditEntryGenerator() {
+    this(ZoneId.systemDefault());
+  }
+
+  @VisibleForTesting
+  AuditEntryGenerator(ZoneId zoneId) {
+    this.zoneId = zoneId;
+  }
 
   private static AuditEntry getDefaultAuditEntry() {
     return new AuditEntry() {
@@ -100,7 +112,7 @@ public class AuditEntryGenerator {
 
   <T> String generate(EntryCreationContext<T> context, Instant timestamp, String username, String action, String entityName, String[] labels) {
     StringBuilder builder = new StringBuilder()
-      .append(timestamp.truncatedTo(ChronoUnit.SECONDS)).append(" ")
+      .append(timestamp.truncatedTo(ChronoUnit.SECONDS).atZone(zoneId)).append(" ")
       .append("[").append(action.toUpperCase()).append("] '")
       .append(username).append("' ")
       .append(action).append(" ");

@@ -34,13 +34,19 @@ import sonia.scm.repository.Repository;
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.Collection;
 import java.util.Set;
+import java.util.TimeZone;
 
 import static java.util.Collections.emptySet;
+import static org.assertj.core.api.Assertions.as;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static sonia.scm.repository.RepositoryTestData.create42Puzzle;
@@ -51,17 +57,21 @@ class DefaultAuditLogServiceTest {
 
   private Connection connection;
   private DefaultAuditLogService service;
+  private final TimeZone defaultTimeZone = TimeZone.getDefault();
 
   @BeforeEach
   void initTestDB() throws SQLException {
-    connection = DriverManager.getConnection("jdbc:h2:mem:unit-tests");
-    service = new DefaultAuditLogService(new AuditLogDatabase("jdbc:h2:mem:unit-tests"), Runnable::run);
+    String connectionUrl = "jdbc:h2:mem:unit-tests;TIME ZONE=ECT";
+    connection = DriverManager.getConnection(connectionUrl);
+    service = new DefaultAuditLogService(new AuditLogDatabase(connectionUrl), Runnable::run);
+    TimeZone.setDefault(TimeZone.getTimeZone("ECT"));
   }
 
   @AfterEach
   void clearDB() throws SQLException {
     connection.createStatement().executeUpdate("DROP TABLE AUDITLOG");
     connection.createStatement().executeUpdate("DROP TABLE LABELS");
+    TimeZone.setDefault(defaultTimeZone);
   }
 
   @Test
@@ -328,6 +338,38 @@ class DefaultAuditLogServiceTest {
         "Diff:\n" +
         "  - 'name' changed: 'oldEntity' -> 'entity'");
     }
+
+    @Test
+    @SubjectAware(value = "trillian")
+    void shouldFilterBasedOnSystemTimeZone() throws SQLException {
+      //01.01.2024 23:00:00 UTC
+      createTimeZoneDependentEntries(1704150000000L, "Too late");
+      //01.01.2024 22:59:59 UTC
+      createTimeZoneDependentEntries(1704149999000L, "within upper limit");
+      //31.12.2023 23:00:00 UTC
+      createTimeZoneDependentEntries(1704063600000L, "within lower limit");
+      //31.12.2023 22:59:59 UTC
+      createTimeZoneDependentEntries(1704063599000L, "Too soon");
+
+      AuditLogFilterContext filter = new AuditLogFilterContext();
+      filter.setFrom(Date.valueOf("2024-01-01"));
+      filter.setTo(Date.valueOf("2024-01-02"));
+      Collection<LogEntry> entries = service.getEntries(filter);
+
+      assertThat(entries).hasSize(2);
+      assertThat(entries.stream().map(LogEntry::getEntity)).containsOnly("within upper limit", "within lower limit");
+    }
+  }
+
+  private void createTimeZoneDependentEntries(long timestamp, String entity) throws SQLException {
+    PreparedStatement statement = connection.prepareStatement("INSERT INTO AUDITLOG(TIMESTAMP_, ENTITY, USERNAME, ACTION_, ENTRY) VALUES (?, ?, ?, ?, ?)");
+    //01.01.2024 23:00 UTC
+    statement.setTimestamp(1, new Timestamp(timestamp));
+    statement.setString(2, entity);
+    statement.setString(3, "user");
+    statement.setString(4, "created");
+    statement.setString(5, "Diff");
+    statement.executeUpdate();
   }
 
   private void prepareDbEntries() {

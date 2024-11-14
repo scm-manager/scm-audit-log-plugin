@@ -49,10 +49,10 @@ public class Filters {
     List<AppliedFilter> appliedFilters = new ArrayList<>();
 
     if (filterContext.getFrom() != null) {
-      appliedFilters.add(new AppliedFilter("AND AUDITLOG.TIMESTAMP_ >= ? ", filterContext.getFrom().toString()));
+      appliedFilters.add(new AppliedFilter("AND CAST(AUDITLOG.TIMESTAMP_ as TIMESTAMP WITH TIME ZONE) >= ? ", filterContext.getFrom().toString()));
     }
     if (filterContext.getTo() != null) {
-      appliedFilters.add(new AppliedFilter("AND AUDITLOG.TIMESTAMP_ <= ? ", filterContext.getTo().toString()));
+      appliedFilters.add(new AppliedFilter("AND CAST(AUDITLOG.TIMESTAMP_ as TIMESTAMP WITH TIME ZONE) < ? ", filterContext.getTo().toString()));
     }
     if (filterContext.getEntity() != null) {
       appliedFilters.add(new AppliedFilter("AND AUDITLOG.ENTITY LIKE ? ", normalizeValue(filterContext.getEntity())));

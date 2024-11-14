@@ -16,6 +16,7 @@
 
 package com.cloudogu.auditlog;
 
+import jakarta.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.junit.jupiter.api.Test;
@@ -29,15 +30,15 @@ import sonia.scm.user.User;
 import sonia.scm.xml.XmlCipherStringAdapter;
 import sonia.scm.xml.XmlEncryptionAdapter;
 
-import jakarta.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class AuditEntryGeneratorTest {
 
-  AuditEntryGenerator generator = new AuditEntryGenerator();
+  AuditEntryGenerator generator = new AuditEntryGenerator(ZoneId.of("UTC"));
 
   @Test
   void shouldCreateEntryForDeletedRepository() {
@@ -51,7 +52,7 @@ class AuditEntryGeneratorTest {
       new String[]{"repository"}
     );
 
-    assertThat(entry).isEqualTo("2023-11-14T22:13:20Z [DELETED] 'trillian' deleted repository 'hitchhiker/42Puzzle'");
+    assertThat(entry).isEqualTo("2023-11-14T22:13:20Z[UTC] [DELETED] 'trillian' deleted repository 'hitchhiker/42Puzzle'");
   }
 
   @Test
@@ -65,7 +66,7 @@ class AuditEntryGeneratorTest {
       new String[]{"user"}
     );
 
-    assertThat(entry).isEqualTo("2023-11-14T22:13:20Z [DELETED] 'trillian' deleted user 'dent'");
+    assertThat(entry).isEqualTo("2023-11-14T22:13:20Z[UTC] [DELETED] 'trillian' deleted user 'dent'");
   }
 
   @Test
@@ -79,14 +80,16 @@ class AuditEntryGeneratorTest {
       new String[]{"user"}
     );
 
-    assertThat(entry).isEqualTo("2023-11-14T22:13:20Z [CREATED] 'trillian' created user 'dent'\n" +
-      "Diff:\n" +
-      "  - 'active' = 'true'\n" +
-      "  - 'displayName' = 'Arthur Dent'\n" +
-      "  - 'mail' = ''\n" +
-      "  - 'name' = 'dent'\n" +
-      "  - 'password' = ********\n" +
-      "  - 'type' = 'internal'\n");
+    assertThat(entry).isEqualTo("""
+      2023-11-14T22:13:20Z[UTC] [CREATED] 'trillian' created user 'dent'
+      Diff:
+        - 'active' = 'true'
+        - 'displayName' = 'Arthur Dent'
+        - 'mail' = ''
+        - 'name' = 'dent'
+        - 'password' = ********
+        - 'type' = 'internal'
+      """);
   }
 
   @Test
@@ -104,12 +107,14 @@ class AuditEntryGeneratorTest {
       new String[]{"repository"}
     );
 
-    assertThat(entry).isEqualTo("2023-11-14T22:13:20Z [MODIFIED] 'trillian' modified repository 'HeartOfGold'\n" +
-      "Diff:\n" +
-      "  - 'contact' changed: 'zaphod.beeblebrox@hitchhiker.com' -> 'douglas.adams@hitchhiker.com'\n" +
-      "  - 'description' changed: 'Heart of Gold is the first prototype ship to successfully utilise the revolutionary Infinite Improbability Drive' -> 'The 42 Puzzle'\n" +
-      "  - 'id' changed: '2' -> '1'\n" +
-      "  - 'name' changed: 'HeartOfGold' -> '42Puzzle'\n");
+    assertThat(entry).isEqualTo("""
+      2023-11-14T22:13:20Z[UTC] [MODIFIED] 'trillian' modified repository 'HeartOfGold'
+      Diff:
+        - 'contact' changed: 'zaphod.beeblebrox@hitchhiker.com' -> 'douglas.adams@hitchhiker.com'
+        - 'description' changed: 'Heart of Gold is the first prototype ship to successfully utilise the revolutionary Infinite Improbability Drive' -> 'The 42 Puzzle'
+        - 'id' changed: '2' -> '1'
+        - 'name' changed: 'HeartOfGold' -> '42Puzzle'
+      """);
   }
 
   @Test
@@ -123,13 +128,15 @@ class AuditEntryGeneratorTest {
       new String[]{"group"}
     );
 
-    assertThat(entry).isEqualTo("2023-11-14T22:13:20Z [MODIFIED] 'trillian' modified group 'admins'\n" +
-      "Diff:\n" +
-      "  - 'members' collection changes :\n" +
-      "     0. 'dent' changed to 'trillian'\n" +
-      "     1. 'zaphod' added\n" +
-      "  - 'name' changed: 'admins' -> 'devs'\n" +
-      "  - 'type' changed: 'external' -> 'internal'\n");
+    assertThat(entry).isEqualTo("""
+      2023-11-14T22:13:20Z[UTC] [MODIFIED] 'trillian' modified group 'admins'
+      Diff:
+        - 'members' collection changes :
+           0. 'dent' changed to 'trillian'
+           1. 'zaphod' added
+        - 'name' changed: 'admins' -> 'devs'
+        - 'type' changed: 'external' -> 'internal'
+      """);
   }
 
   @Test
@@ -144,10 +151,12 @@ class AuditEntryGeneratorTest {
       new String[]{"redmine", "configuration", "repository"}
     );
 
-    assertThat(entry).isEqualTo("2023-11-14T22:13:20Z [MODIFIED] 'trillian' modified redmine configuration for repository 'hitchhiker/42Puzzle'\n" +
-      "Diff:\n" +
-      "  - 'token' changed: ********\n" +
-      "  - 'url' changed: '1234' -> '123'\n");
+    assertThat(entry).isEqualTo("""
+      2023-11-14T22:13:20Z[UTC] [MODIFIED] 'trillian' modified redmine configuration for repository 'hitchhiker/42Puzzle'
+      Diff:
+        - 'token' changed: ********
+        - 'url' changed: '1234' -> '123'
+      """);
   }
 
   @Test
@@ -173,11 +182,13 @@ class AuditEntryGeneratorTest {
       "",
       new String[]{});
 
-    assertThat(entry).isEqualTo("2023-11-14T22:13:20Z [MODIFIED] 'trillian' modified \n" +
-      "Diff:\n" +
-      "  - 'name' = 'test'\n" +
-      "  - 'password' = ********\n" +
-      "  - 'token' = ********\n");
+    assertThat(entry).isEqualTo("""
+      2023-11-14T22:13:20Z[UTC] [MODIFIED] 'trillian' modified\s
+      Diff:
+        - 'name' = 'test'
+        - 'password' = ********
+        - 'token' = ********
+      """);
   }
 
   @Test

@@ -22,6 +22,7 @@ import org.github.sdorra.jse.ShiroExtension;
 import org.github.sdorra.jse.SubjectAware;
 import org.jboss.resteasy.mock.MockHttpRequest;
 import org.jboss.resteasy.mock.MockHttpResponse;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,10 +34,12 @@ import sonia.scm.web.JsonMockHttpResponse;
 import sonia.scm.web.RestDispatcher;
 
 import jakarta.inject.Provider;
+
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Instant;
+import java.util.TimeZone;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -59,8 +62,11 @@ class AuditLogResourceTest {
 
   private RestDispatcher restDispatcher;
 
+  private final TimeZone defaultTimeZone = TimeZone.getDefault();
+
   @BeforeEach
   void init() {
+    TimeZone.setDefault(TimeZone.getTimeZone("ECT"));
     restDispatcher = new RestDispatcher();
     restDispatcher.addSingletonResource(resource);
     ScmPathInfoStore scmPathInfoStore = new ScmPathInfoStore();
@@ -68,29 +74,51 @@ class AuditLogResourceTest {
     lenient().when(scmPathInfoStoreProvider.get()).thenReturn(scmPathInfoStore);
   }
 
+  @AfterEach
+  void cleanUp() {
+    TimeZone.setDefault(defaultTimeZone);
+  }
+
   @Test
   void shouldGetEntriesAsText() throws URISyntaxException, UnsupportedEncodingException {
-    when(service.getEntries(any())).thenReturn(ImmutableList.of(new LogEntry(Instant.ofEpochMilli(1700000000), "admins", "trillian", "modified", "2023-11-14T22:13:20Z [MODIFIED] 'trillian' modified group 'admins'\n" +
-      "Diff:\n" +
-      "* changes on sonia.scm.group.Group/ :\n" +
-      "  - 'type' changed: 'external' -> 'internal'"), new LogEntry(Instant.ofEpochMilli(1700000000), "admins", "trillian", "modified", "2023-11-14T22:13:20Z [MODIFIED] 'trillian' modified group 'admins'\n" +
-      "Diff:\n" +
-      "* changes on sonia.scm.group.Group/ :\n" +
-      "  - 'type' changed: 'internal' -> 'external'")));
+    when(service.getEntries(any())).thenReturn(
+      ImmutableList.of(
+        new LogEntry(
+          Instant.ofEpochMilli(1700000000),
+          "admins",
+          "trillian",
+          "modified",
+          """
+            2023-11-14T22:13:20Z [MODIFIED] 'trillian' modified group 'admins'
+            Diff:
+            * changes on sonia.scm.group.Group/ :
+              - 'type' changed: 'external' -> 'internal'"""),
+        new LogEntry(
+          Instant.ofEpochMilli(1700000000),
+          "admins",
+          "trillian",
+          "modified",
+          """
+            2023-11-14T22:13:20Z [MODIFIED] 'trillian' modified group 'admins'
+            Diff:
+            * changes on sonia.scm.group.Group/ :
+              - 'type' changed: 'internal' -> 'external'""")));
 
     MockHttpRequest request = MockHttpRequest.get("/v2/audit-log/export/text-plain");
     MockHttpResponse response = new MockHttpResponse();
 
     restDispatcher.invoke(request, response);
 
-    assertThat(response.getContentAsString()).isEqualTo("2023-11-14T22:13:20Z [MODIFIED] 'trillian' modified group 'admins'\n" +
-      "Diff:\n" +
-      "* changes on sonia.scm.group.Group/ :\n" +
-      "  - 'type' changed: 'external' -> 'internal'\n" +
-      "2023-11-14T22:13:20Z [MODIFIED] 'trillian' modified group 'admins'\n" +
-      "Diff:\n" +
-      "* changes on sonia.scm.group.Group/ :\n" +
-      "  - 'type' changed: 'internal' -> 'external'\n");
+    assertThat(response.getContentAsString()).isEqualTo("""
+      2023-11-14T22:13:20Z [MODIFIED] 'trillian' modified group 'admins'
+      Diff:
+      * changes on sonia.scm.group.Group/ :
+        - 'type' changed: 'external' -> 'internal'
+      2023-11-14T22:13:20Z [MODIFIED] 'trillian' modified group 'admins'
+      Diff:
+      * changes on sonia.scm.group.Group/ :
+        - 'type' changed: 'internal' -> 'external'
+      """);
   }
 
   @Test
@@ -113,13 +141,15 @@ class AuditLogResourceTest {
 
   @Test
   void shouldGetEntriesAsCsv() throws URISyntaxException, UnsupportedEncodingException {
-    when(service.getEntries(any())).thenReturn(ImmutableList.of(new LogEntry(Instant.ofEpochMilli(1700000000), "admins", "trillian", "modified", "2023-11-14T22:13:20Z [MODIFIED] 'trillian' modified group 'admins'\n" +
-      "Diff:\n" +
-      "* changes on sonia.scm.group.Group/ :\n" +
-      "  - 'type' changed: 'external' -> 'internal'"), new LogEntry(Instant.ofEpochMilli(1700000000), "admins", "trillian", "modified", "2023-11-14T22:13:20Z [MODIFIED] 'trillian' modified group 'admins'\n" +
-      "Diff:\n" +
-      "* changes on sonia.scm.group.Group/ :\n" +
-      "  - 'type' changed: 'internal' -> 'external'")));
+    when(service.getEntries(any())).thenReturn(ImmutableList.of(new LogEntry(Instant.ofEpochMilli(1700000000), "admins", "trillian", "modified", """
+      2023-11-14T22:13:20Z [MODIFIED] 'trillian' modified group 'admins'
+      Diff:
+      * changes on sonia.scm.group.Group/ :
+        - 'type' changed: 'external' -> 'internal'"""), new LogEntry(Instant.ofEpochMilli(1700000000), "admins", "trillian", "modified", """
+      2023-11-14T22:13:20Z [MODIFIED] 'trillian' modified group 'admins'
+      Diff:
+      * changes on sonia.scm.group.Group/ :
+        - 'type' changed: 'internal' -> 'external'""")));
 
     MockHttpRequest request = MockHttpRequest.get("/v2/audit-log/export/csv");
     MockHttpResponse response = new MockHttpResponse();
@@ -153,15 +183,17 @@ class AuditLogResourceTest {
   void shouldGetEntriesAsJson() throws URISyntaxException {
     when(service.getEntries(any())).thenReturn(ImmutableList.of(
       new LogEntry(Instant.ofEpochMilli(1700000000), "admins", "trillian", "modified",
-        "2023-11-14T22:13:20Z [MODIFIED] 'trillian' modified group 'admins'\n" +
-          "Diff:\n" +
-          "* changes on sonia.scm.group.Group/ :\n" +
-          "  - 'type' changed: 'external' -> 'internal'"),
+        """
+          2023-11-14T22:13:20Z [MODIFIED] 'trillian' modified group 'admins'
+          Diff:
+          * changes on sonia.scm.group.Group/ :
+            - 'type' changed: 'external' -> 'internal'"""),
       new LogEntry(Instant.ofEpochMilli(1700000000), "admins", "trillian", "modified",
-        "2023-11-14T22:13:20Z [MODIFIED] 'trillian' modified group 'admins'\n" +
-          "Diff:\n" +
-          "* changes on sonia.scm.group.Group/ :\n" +
-          "  - 'type' changed: 'internal' -> 'external'")));
+        """
+          2023-11-14T22:13:20Z [MODIFIED] 'trillian' modified group 'admins'
+          Diff:
+          * changes on sonia.scm.group.Group/ :
+            - 'type' changed: 'internal' -> 'external'""")));
 
     when(service.getTotalEntries(any())).thenReturn(1);
 
@@ -175,15 +207,17 @@ class AuditLogResourceTest {
     assertThat(content.get("pageTotal").asInt()).isEqualTo(1);
 
     assertThat(content.get("_embedded").get("entries").get(0).get("entry").textValue())
-      .isEqualTo("2023-11-14T22:13:20Z [MODIFIED] 'trillian' modified group 'admins'\n" +
-        "Diff:\n" +
-        "* changes on sonia.scm.group.Group/ :\n" +
-        "  - 'type' changed: 'external' -> 'internal'");
+      .isEqualTo("""
+        2023-11-14T22:13:20Z [MODIFIED] 'trillian' modified group 'admins'
+        Diff:
+        * changes on sonia.scm.group.Group/ :
+          - 'type' changed: 'external' -> 'internal'""");
     assertThat(content.get("_embedded").get("entries").get(1).get("entry").textValue())
-      .isEqualTo("2023-11-14T22:13:20Z [MODIFIED] 'trillian' modified group 'admins'\n" +
-        "Diff:\n" +
-        "* changes on sonia.scm.group.Group/ :\n" +
-        "  - 'type' changed: 'internal' -> 'external'");
+      .isEqualTo("""
+        2023-11-14T22:13:20Z [MODIFIED] 'trillian' modified group 'admins'
+        Diff:
+        * changes on sonia.scm.group.Group/ :
+          - 'type' changed: 'internal' -> 'external'""");
 
     JsonNode links = content.get("_links");
     assertThat(links.get("self")).isNotNull();
@@ -207,6 +241,23 @@ class AuditLogResourceTest {
       assertThat(filterContext.getTo()).hasToString("2023-02-02");
       return true;
     }));
+  }
+
+  @Test
+  void shouldEncodeTimestampWithSystemDefaultZoneWhenExportingToCSV() throws UnsupportedEncodingException, URISyntaxException {
+    when(service.getEntries(any())).thenReturn(ImmutableList.of(new LogEntry(Instant.ofEpochMilli(1700000000), "admins", "trillian", "modified", """
+      1970-01-20T17:13:20+01:00[Europe/Paris] [MODIFIED] 'trillian' modified group 'admins'
+      Diff:
+      * changes on sonia.scm.group.Group/ :
+        - 'type' changed: 'external' -> 'internal'""")));
+
+    MockHttpRequest request = MockHttpRequest.get("/v2/audit-log/export/csv");
+    MockHttpResponse response = new MockHttpResponse();
+
+    restDispatcher.invoke(request, response);
+
+    assertThat(response.getContentAsString()).contains("Timestamp,Username,Action,Entity,Diff")
+      .contains("1970-01-20T17:13:20+01:00[Europe/Paris],trillian,modified,admins,1970-01-20T17:13:20+01:00[Europe/Paris] [MODIFIED] 'trillian' modified group 'admins' Diff: * changes on sonia.scm.group.Group/ :   - 'type' changed: 'external' -> 'internal'");
   }
 
 }

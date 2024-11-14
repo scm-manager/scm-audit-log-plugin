@@ -44,6 +44,7 @@ import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.StreamingOutput;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.time.ZoneId;
 import java.util.EnumSet;
 import java.util.List;
 
@@ -104,10 +105,11 @@ public class AuditLogResource {
           .setHeader("Timestamp", "Username", "Action", "Entity", "Diff")
           .build();
         CSVPrinter csvPrinter = new CSVPrinter(out, csvFormat);
+        ZoneId systemDefaultZone = ZoneId.systemDefault();
         auditLogService.getEntries(new AuditLogFilterContext(page, limit, entity, username, from, to, label, action))
           .forEach(e -> {
               try {
-                csvPrinter.printRecord(e.getTimestamp(), e.getUser(), e.getAction(), e.getEntity(), e.getEntry().replace("\n", " "));
+                csvPrinter.printRecord(e.getTimestamp().atZone(systemDefaultZone), e.getUser(), e.getAction(), e.getEntity(), e.getEntry().replace("\n", " "));
               } catch (IOException ex) {
                 throw new AuditLogException("Export as csv failed ", ex);
               }
