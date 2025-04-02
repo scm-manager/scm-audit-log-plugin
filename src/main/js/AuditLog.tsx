@@ -17,6 +17,7 @@
 import React, { FC, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ErrorNotification, Level, LinkPaginator, Loading, Title, urls } from "@scm-manager/ui-components";
+import { useDocumentTitle } from "@scm-manager/ui-core";
 import { Filters, useAuditLog } from "./useAuditLog";
 import { Redirect, useLocation, useRouteMatch } from "react-router-dom";
 import { Link, Links } from "@scm-manager/ui-types";
@@ -47,7 +48,6 @@ const ExportButton: FC<{ links: Links; filters: Filters }> = ({ links, filters }
 };
 
 const AuditLog: FC<{ links: Links }> = ({ links }) => {
-  const [t] = useTranslation("plugins");
   const match = useRouteMatch();
   const page = urls.getPageFromMatch(match);
   const location = useLocation();
@@ -65,8 +65,13 @@ const AuditLog: FC<{ links: Links }> = ({ links }) => {
     from: "",
     to: ""
   });
-
   const { data, error, isLoading } = useAuditLog(page, filters);
+  const [t] = useTranslation("plugins");
+  useDocumentTitle(
+    data?.pageTotal && data.pageTotal > 1 && page
+      ? t("scm-audit-log-plugin.auditLogWithPage", { page, total: data.pageTotal })
+      : t("scm-audit-log-plugin.title"),
+  );
 
   const filterForm = (
     <Form<Filters>

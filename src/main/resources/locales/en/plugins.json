@@ -42,7 +42,8 @@
       "applyButton": "Apply filter",
       "resetButton": "Reset filter",
       "exportButton": "Export as CSV"
-    }
+    },
+    "auditLogWithPage": "Audit Log page {{page}} of {{total}}"
   },
   "permissions": {
     "auditLog": {
