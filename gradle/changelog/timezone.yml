@@ -1,2 +1,0 @@
-- type: changed
-  description: The audit log timestamps will now use the timezone of the server
