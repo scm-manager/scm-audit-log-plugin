@@ -39,6 +39,7 @@ import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.TimeZone;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
@@ -132,9 +133,9 @@ class AuditLogResourceTest {
       assertThat(filterContext.getEntity()).isEqualTo("scmadmin");
       assertThat(filterContext.getUsername()).isEqualTo("trillian");
       assertThat(filterContext.getLabel()).isEqualTo("jenkins");
-      assertThat(filterContext.getFrom()).hasToString("2023-01-01");
+      assertThat(filterContext.getFrom().atZone(ZoneId.of("CET")).toString()).startsWith("2023-01-01");
       // Day increased by one to 'include' all matches
-      assertThat(filterContext.getTo()).hasToString("2023-02-02");
+      assertThat(filterContext.getTo().atZone(ZoneId.of("CET")).toString()).startsWith("2023-02-02");
       return true;
     }));
   }
@@ -172,9 +173,9 @@ class AuditLogResourceTest {
       assertThat(filterContext.getEntity()).isEqualTo("scmadmin");
       assertThat(filterContext.getUsername()).isEqualTo("trillian");
       assertThat(filterContext.getLabel()).isEqualTo("jenkins");
-      assertThat(filterContext.getFrom()).hasToString("2023-01-01");
+      assertThat(filterContext.getFrom().atZone(ZoneId.of("CET")).toString()).startsWith("2023-01-01");
       // Day increased by one to 'include' all matches
-      assertThat(filterContext.getTo()).hasToString("2023-02-02");
+      assertThat(filterContext.getTo().atZone(ZoneId.of("CET")).toString()).startsWith("2023-02-02");
       return true;
     }));
   }
@@ -236,9 +237,9 @@ class AuditLogResourceTest {
       assertThat(filterContext.getEntity()).isEqualTo("scmadmin");
       assertThat(filterContext.getUsername()).isEqualTo("trillian");
       assertThat(filterContext.getLabel()).isEqualTo("jenkins");
-      assertThat(filterContext.getFrom()).hasToString("2023-01-01");
+      assertThat(filterContext.getFrom().atZone(ZoneId.of("CET")).toString()).startsWith("2023-01-01T00:00");
       // Day increased by one to 'include' all matches
-      assertThat(filterContext.getTo()).hasToString("2023-02-02");
+      assertThat(filterContext.getTo().atZone(ZoneId.of("CET")).toString()).startsWith("2023-02-02T00:00");
       return true;
     }));
   }

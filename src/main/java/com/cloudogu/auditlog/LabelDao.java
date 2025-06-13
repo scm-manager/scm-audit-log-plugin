@@ -14,26 +14,10 @@
  * along with this program. If not, see https://www.gnu.org/licenses/.
  */
 
-plugins {
-  id 'org.scm-manager.smp' version '0.19.0'
-}
+package com.cloudogu.auditlog;
 
-dependencies {
-  implementation 'com.h2database:h2:2.1.214'
-  implementation 'org.javers:javers-core:6.7.1'
-  implementation 'org.apache.commons:commons-csv:1.10.0'
-}
+import sonia.scm.store.QueryableType;
 
-scmPlugin {
-  scmVersion = "3.8.1-SNAPSHOT"
-  displayName = "Audit Log"
-  description = "Logs various actions on your server"
-  author = "Cloudogu GmbH"
-  category = "Administration"
-
-  openapi {
-    packages = [
-      "com.cloudogu.auditlog"
-    ]
-  }
+@QueryableType
+public class LabelDao {
 }

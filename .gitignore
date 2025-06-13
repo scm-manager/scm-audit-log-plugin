@@ -306,6 +306,3 @@ gradle-app.setting
 
 *.iml
 .idea
-
-# Local h2 db
-**/*.db

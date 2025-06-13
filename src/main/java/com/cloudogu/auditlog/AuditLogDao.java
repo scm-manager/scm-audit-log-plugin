@@ -14,26 +14,23 @@
  * along with this program. If not, see https://www.gnu.org/licenses/.
  */
 
-plugins {
-  id 'org.scm-manager.smp' version '0.19.0'
-}
+package com.cloudogu.auditlog;
 
-dependencies {
-  implementation 'com.h2database:h2:2.1.214'
-  implementation 'org.javers:javers-core:6.7.1'
-  implementation 'org.apache.commons:commons-csv:1.10.0'
-}
+import lombok.Data;
+import sonia.scm.store.QueryableType;
 
-scmPlugin {
-  scmVersion = "3.8.1-SNAPSHOT"
-  displayName = "Audit Log"
-  description = "Logs various actions on your server"
-  author = "Cloudogu GmbH"
-  category = "Administration"
+import java.time.Instant;
+import java.util.Collection;
 
-  openapi {
-    packages = [
-      "com.cloudogu.auditlog"
-    ]
-  }
+import static sonia.scm.store.IdGenerator.AUTO_INCREMENT;
+
+@Data
+@QueryableType(idGenerator = AUTO_INCREMENT)
+public class AuditLogDao {
+  private Instant timestamp;
+  private String entityName;
+  private String action;
+  private String username;
+  private Collection<String> labels;
+  private String entry;
 }

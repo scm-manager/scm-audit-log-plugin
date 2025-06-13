@@ -18,74 +18,49 @@ package com.cloudogu.auditlog;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.UnavailableSecurityManagerException;
 import sonia.scm.auditlog.EntryCreationContext;
 import sonia.scm.plugin.Extension;
+import sonia.scm.store.Condition;
+import sonia.scm.store.QueryableMutableStore;
+import sonia.scm.store.QueryableStore;
 
-import jakarta.inject.Inject;
-import jakarta.inject.Singleton;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
 
 import static com.cloudogu.auditlog.EntryContextResolver.resolveAction;
 import static com.cloudogu.auditlog.EntryContextResolver.resolveEntityName;
 import static com.cloudogu.auditlog.EntryContextResolver.resolveLabels;
-import static com.cloudogu.auditlog.Filters.resolveAppliedFilters;
-import static com.cloudogu.auditlog.Filters.setFilterValues;
-import static com.cloudogu.auditlog.SqlQueryGenerator.createCountQuery;
-import static com.cloudogu.auditlog.SqlQueryGenerator.createEntriesQuery;
-import static com.cloudogu.auditlog.SqlQueryGenerator.createLabelsQuery;
 
 @Slf4j
 @Extension
 @Singleton
 public class DefaultAuditLogService implements AuditLogService {
 
-  private final AuditLogDatabase database;
-  private final Executor executor;
   private final AuditEntryGenerator entryGenerator = new AuditEntryGenerator();
-
+  private final AuditLogDaoStoreFactory daoStoreFactory;
+  private final LabelDaoStoreFactory labelDaoStoreFactory;
 
   @Inject
-  public DefaultAuditLogService(AuditLogDatabase database) {
-    this(
-      database,
-      // Since h2 is single threaded, we use the executor to serialize the write requests
-      Executors.newSingleThreadExecutor(
-        new ThreadFactoryBuilder()
-          .setNameFormat("AuditLogAsyncExecutor-%d")
-          .build()
-      )
-    );
-  }
-
-  @VisibleForTesting
-  @SuppressWarnings("java:S2115")
-    // We don't need a password here. This database contains no secrets.
-  DefaultAuditLogService(AuditLogDatabase database, Executor executor) {
-    this.database = database;
-    this.executor = executor;
+  public DefaultAuditLogService(AuditLogDaoStoreFactory daoStoreFactory, LabelDaoStoreFactory labelDaoStoreFactory) {
+    this.daoStoreFactory = daoStoreFactory;
+    this.labelDaoStoreFactory = labelDaoStoreFactory;
   }
 
   @Override
   public void createEntry(EntryCreationContext<?> context) {
     String username = getUsername();
-    executor.execute(() -> createDBEntry(username, context));
+    createDBEntry(username, context);
+    createLabelsForNewEntry(resolveLabels(context));
   }
 
   private void createDBEntry(String username, EntryCreationContext<?> context) {
@@ -94,23 +69,17 @@ public class DefaultAuditLogService implements AuditLogService {
     String action = resolveAction(context);
     String[] labels = resolveLabels(context);
     String entry = entryGenerator.generate(context, timestamp, username, action, entityName, labels);
-    try (Connection connection = database.getConnection(); PreparedStatement statement = connection.prepareStatement(
-      "INSERT INTO AUDITLOG(TIMESTAMP_, ENTITY, USERNAME, ACTION_, ENTRY) VALUES (?, ?, ?, ?, ?)",
-      Statement.RETURN_GENERATED_KEYS)
-    ) {
-      statement.setTimestamp(1, new Timestamp(timestamp.toEpochMilli()));
-      statement.setString(2, entityName.toLowerCase());
-      statement.setString(3, !Strings.isNullOrEmpty(username) ? username.toLowerCase() : username);
-      statement.setString(4, action.toLowerCase());
-      if (!Strings.isNullOrEmpty(entry)) {
-        statement.setString(5, entry);
-        statement.executeUpdate();
-
-        statement.getGeneratedKeys().next();
-        createLabelsForNewEntry(statement.getGeneratedKeys().getInt(1), labels);
+    if (!Strings.isNullOrEmpty(entry)) {
+      AuditLogDao auditLogDao = new AuditLogDao();
+      auditLogDao.setTimestamp(timestamp);
+      auditLogDao.setEntityName(entityName.toLowerCase());
+      auditLogDao.setUsername(!Strings.isNullOrEmpty(username) ? username.toLowerCase() : username);
+      auditLogDao.setAction(action.toLowerCase());
+      auditLogDao.setLabels(Set.of(labels));
+      auditLogDao.setEntry(entry);
+      try (QueryableMutableStore<AuditLogDao> mutableStore = daoStoreFactory.getMutable()) {
+        mutableStore.put(auditLogDao);
       }
-    } catch (Exception e) {
-      log.error("Could not create new entry for audit log for entity '{}' with action {}: {}", entityName, action, entry, e);
     }
   }
 
@@ -120,51 +89,37 @@ public class DefaultAuditLogService implements AuditLogService {
   }
 
   @VisibleForTesting
+  @SuppressWarnings("unchecked")
   List<LogEntry> getLogEntries(AuditLogFilterContext filterContext) {
-    List<Filters.AppliedFilter> appliedFilters = resolveAppliedFilters(filterContext);
-    String query = createEntriesQuery(filterContext, appliedFilters);
-    try (Connection connection = database.getConnection(); PreparedStatement statement = connection.prepareStatement(query)) {
-      setFilterValues(statement, appliedFilters);
-      ResultSet resultSet = statement.executeQuery();
-      List<LogEntry> entries = new ArrayList<>();
-      while (resultSet.next()) {
-        addSingleEntry(entries, resultSet);
-      }
-      return entries;
-    } catch (SQLException e) {
-      throw new AuditLogException("Failed to read audit log", e);
-    }
+    QueryableStore<AuditLogDao> daoQueryableStore = daoStoreFactory.get();
+    Condition<AuditLogDao>[] filters = resolveAppliedQueryFilters(filterContext);
+    return daoQueryableStore.query(filters)
+      .orderBy(AuditLogDaoQueryFields.INTERNAL_ID, QueryableStore.Order.DESC)
+      .findAll((long) (filterContext.getPageNumber() - 1) * filterContext.getLimit(), filterContext.getLimit())
+      .stream()
+      .map(dao -> new LogEntry(
+        dao.getTimestamp(),
+        dao.getEntityName(),
+        dao.getUsername(),
+        dao.getAction(),
+        dao.getEntry()
+      ))
+      .toList();
   }
 
   @Override
   public int getTotalEntries(AuditLogFilterContext filterContext) {
     PermissionChecker.checkReadAuditLog();
-    List<Filters.AppliedFilter> appliedFilters = resolveAppliedFilters(filterContext);
-    String query = createCountQuery(filterContext, appliedFilters);
-    try (Connection connection = database.getConnection(); PreparedStatement statement = connection.prepareStatement(query)) {
-      setFilterValues(statement, appliedFilters);
-      ResultSet resultSet = statement.executeQuery();
-      resultSet.next();
-      return resultSet.getInt("total");
-    } catch (SQLException e) {
-      throw new AuditLogException("Failed to count audit log entries", e);
-    }
+
+    QueryableStore<AuditLogDao> daoQueryableStore = daoStoreFactory.get();
+    return (int) daoQueryableStore.query(
+      resolveAppliedQueryFilters(filterContext)
+    ).count();
   }
 
   @Override
   public Set<String> getLabels() {
-    try (Connection connection = database.getConnection(); Statement statement = connection.createStatement()) {
-      String query = createLabelsQuery();
-      ResultSet resultSet = statement.executeQuery(query);
-
-      Set<String> labels = new HashSet<>();
-      while (resultSet.next()) {
-        labels.add(resultSet.getString("LABEL"));
-      }
-      return labels;
-    } catch (SQLException e) {
-      throw new AuditLogException("Failed to collect audit log labels", e);
-    }
+    return labelDaoStoreFactory.getMutable().getAll().keySet();
   }
 
   private static String getUsername() {
@@ -176,25 +131,35 @@ public class DefaultAuditLogService implements AuditLogService {
     }
   }
 
-  private void createLabelsForNewEntry(int id, String[] labels) throws SQLException {
-    try (Connection connection = database.getConnection();
-         PreparedStatement statement = connection.prepareStatement("INSERT INTO LABELS(AUDIT, LABEL) VALUES (?, ?)")) {
-      for (String label : labels) {
-        statement.setInt(1, id);
-        statement.setString(2, label.toLowerCase());
-        statement.executeUpdate();
-      }
+  private void createLabelsForNewEntry(String[] labels) {
+    try (QueryableMutableStore<LabelDao> store = labelDaoStoreFactory.getMutable()) {
+      Arrays.stream(labels).forEach(
+        label -> store.put(label.toLowerCase(), new LabelDao())
+      );
     }
   }
 
-  private void addSingleEntry(List<LogEntry> entries, ResultSet resultSet) throws SQLException {
-    LogEntry logEntry = new LogEntry();
-    logEntry.setEntity(resultSet.getString("ENTITY"));
-    logEntry.setUser(resultSet.getString("USERNAME"));
-    logEntry.setAction(resultSet.getString("ACTION_"));
-    logEntry.setEntry(resultSet.getString("ENTRY"));
-    logEntry.setTimestamp(resultSet.getTimestamp("TIMESTAMP_").toInstant());
-
-    entries.add(logEntry);
+  @SuppressWarnings("unchecked")
+  private Condition<AuditLogDao>[] resolveAppliedQueryFilters(AuditLogFilterContext filterContext) {
+    List<Condition<AuditLogDao>> conditions = new ArrayList<>();
+    if (filterContext.getFrom() != null) {
+      conditions.add(AuditLogDaoQueryFields.TIMESTAMP.after(filterContext.getFrom().minus(1, ChronoUnit.MILLIS)));
+    }
+    if (filterContext.getTo() != null) {
+      conditions.add(AuditLogDaoQueryFields.TIMESTAMP.before(filterContext.getTo().plus(1, ChronoUnit.MILLIS)));
+    }
+    if (filterContext.getEntity() != null) {
+      conditions.add(AuditLogDaoQueryFields.ENTITYNAME.like(filterContext.getEntity()));
+    }
+    if (filterContext.getUsername() != null) {
+      conditions.add(AuditLogDaoQueryFields.USERNAME.like(filterContext.getUsername()));
+    }
+    if (filterContext.getLabel() != null) {
+      conditions.add(AuditLogDaoQueryFields.LABELS.contains(filterContext.getLabel()));
+    }
+    if (filterContext.getAction() != null) {
+      conditions.add(AuditLogDaoQueryFields.ACTION.eq(filterContext.getAction()));
+    }
+    return conditions.toArray(new Condition[0]);
   }
 }

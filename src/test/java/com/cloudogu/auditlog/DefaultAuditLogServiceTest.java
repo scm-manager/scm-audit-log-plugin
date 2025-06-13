@@ -20,7 +20,6 @@ import lombok.AllArgsConstructor;
 import org.apache.shiro.authz.AuthorizationException;
 import org.github.sdorra.jse.ShiroExtension;
 import org.github.sdorra.jse.SubjectAware;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -30,48 +29,29 @@ import sonia.scm.auditlog.AuditEntry;
 import sonia.scm.auditlog.AuditLogEntity;
 import sonia.scm.auditlog.EntryCreationContext;
 import sonia.scm.repository.Repository;
+import sonia.scm.store.QueryableStoreExtension;
 
-import java.sql.Connection;
-import java.sql.Date;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
-import java.sql.Timestamp;
-import java.time.Clock;
 import java.time.Instant;
-import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.Collection;
 import java.util.Set;
 import java.util.TimeZone;
 
 import static java.util.Collections.emptySet;
-import static org.assertj.core.api.Assertions.as;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static sonia.scm.repository.RepositoryTestData.create42Puzzle;
 import static sonia.scm.repository.RepositoryTestData.createHeartOfGold;
 
-@ExtendWith({MockitoExtension.class, ShiroExtension.class})
+@ExtendWith({MockitoExtension.class, ShiroExtension.class, QueryableStoreExtension.class})
+@QueryableStoreExtension.QueryableTypes({AuditLogDao.class, LabelDao.class})
 class DefaultAuditLogServiceTest {
 
-  private Connection connection;
   private DefaultAuditLogService service;
-  private final TimeZone defaultTimeZone = TimeZone.getDefault();
 
   @BeforeEach
-  void initTestDB() throws SQLException {
-    String connectionUrl = "jdbc:h2:mem:unit-tests;TIME ZONE=ECT";
-    connection = DriverManager.getConnection(connectionUrl);
-    service = new DefaultAuditLogService(new AuditLogDatabase(connectionUrl), Runnable::run);
-    TimeZone.setDefault(TimeZone.getTimeZone("ECT"));
-  }
-
-  @AfterEach
-  void clearDB() throws SQLException {
-    connection.createStatement().executeUpdate("DROP TABLE AUDITLOG");
-    connection.createStatement().executeUpdate("DROP TABLE LABELS");
-    TimeZone.setDefault(defaultTimeZone);
+  void initTestDB(AuditLogDaoStoreFactory auditLogDaoStoreFactory, LabelDaoStoreFactory labelDaoStoreFactory) {
+    service = new DefaultAuditLogService(auditLogDaoStoreFactory, labelDaoStoreFactory);
   }
 
   @Test
@@ -238,6 +218,18 @@ class DefaultAuditLogServiceTest {
 
     @Test
     @SubjectAware(value = "trillian")
+    void shouldGetEntriesByEntityFilterWithWildcard() {
+      prepareDbEntries();
+
+      AuditLogFilterContext filter = new AuditLogFilterContext();
+      filter.setEntity("*ll*");
+      Collection<LogEntry> entries = service.getEntries(filter);
+
+      assertThat(entries).hasSize(1);
+    }
+
+    @Test
+    @SubjectAware(value = "trillian")
     void shouldGetEntriesByLabelFilter() {
       prepareDbEntries();
 
@@ -253,14 +245,26 @@ class DefaultAuditLogServiceTest {
     @Test
     @SubjectAware(value = "trillian")
     void shouldGetEntriesByUsernameFilter() {
-      EntryCreationContext<?> creationContext = new EntryCreationContext<>(new TestEntity("entity"), null, "TRILLIAN", emptySet());
-      service.createEntry(creationContext);
-
-      creationContext = new EntryCreationContext<>(new WithoutAnnotation("anno"), null, "DENT", emptySet());
-      service.createEntry(creationContext);
+      service.createEntry(new EntryCreationContext<>(new TestEntity("entity"), null, "TRILLIAN", emptySet()));
+      service.createEntry(new EntryCreationContext<>(new WithoutAnnotation("anno"), null, "DENT", emptySet()));
 
       AuditLogFilterContext filter = new AuditLogFilterContext();
       filter.setUsername("trillian");
+      Collection<LogEntry> entries = service.getEntries(filter);
+
+      assertThat(entries).hasSize(2);
+      LogEntry entry = entries.iterator().next();
+      assertThat(entry.getUser()).isEqualTo("trillian");
+    }
+
+    @Test
+    @SubjectAware(value = "trillian")
+    void shouldGetEntriesByUsernameFilterWithWildcard() {
+      service.createEntry(new EntryCreationContext<>(new TestEntity("entity"), null, "TRILLIAN", emptySet()));
+      service.createEntry(new EntryCreationContext<>(new WithoutAnnotation("anno"), null, "DENT", emptySet()));
+
+      AuditLogFilterContext filter = new AuditLogFilterContext();
+      filter.setUsername("trill*");
       Collection<LogEntry> entries = service.getEntries(filter);
 
       assertThat(entries).hasSize(2);
@@ -274,7 +278,7 @@ class DefaultAuditLogServiceTest {
       prepareDbEntries();
 
       AuditLogFilterContext filter = new AuditLogFilterContext();
-      filter.setFrom(new Date(Instant.now().minus(5, ChronoUnit.DAYS).toEpochMilli()));
+      filter.setFrom(Instant.now().minus(5, ChronoUnit.DAYS).truncatedTo(ChronoUnit.DAYS));
       Collection<LogEntry> entries = service.getEntries(filter);
 
       assertThat(entries).hasSize(2);
@@ -286,7 +290,7 @@ class DefaultAuditLogServiceTest {
       prepareDbEntries();
 
       AuditLogFilterContext filter = new AuditLogFilterContext();
-      filter.setTo(new Date(Instant.now().plus(5, ChronoUnit.DAYS).toEpochMilli()));
+      filter.setTo(Instant.now().plus(2, ChronoUnit.DAYS));
       Collection<LogEntry> entries = service.getEntries(filter);
 
       assertThat(entries).hasSize(2);
@@ -298,8 +302,8 @@ class DefaultAuditLogServiceTest {
       prepareDbEntries();
 
       AuditLogFilterContext filter = new AuditLogFilterContext();
-      filter.setFrom(new Date(Instant.now().minus(5, ChronoUnit.DAYS).toEpochMilli()));
-      filter.setTo(new Date(Instant.now().plus(5, ChronoUnit.DAYS).toEpochMilli()));
+      filter.setFrom(Instant.now().minus(5, ChronoUnit.DAYS));
+      filter.setTo(Instant.now().plus(5, ChronoUnit.DAYS));
       Collection<LogEntry> entries = service.getEntries(filter);
 
       assertThat(entries).hasSize(2);
@@ -323,8 +327,8 @@ class DefaultAuditLogServiceTest {
       prepareDbEntries();
 
       AuditLogFilterContext filter = new AuditLogFilterContext();
-      filter.setFrom(new Date(Instant.now().minus(5, ChronoUnit.DAYS).toEpochMilli()));
-      filter.setTo(new Date(Instant.now().plus(5, ChronoUnit.DAYS).toEpochMilli()));
+      filter.setFrom(Instant.now().minus(5, ChronoUnit.DAYS));
+      filter.setTo(Instant.now().plus(5, ChronoUnit.DAYS));
       filter.setUsername("trillian");
       filter.setLabel("test");
       filter.setEntity("TRILLIAN");
@@ -341,35 +345,45 @@ class DefaultAuditLogServiceTest {
 
     @Test
     @SubjectAware(value = "trillian")
-    void shouldFilterBasedOnSystemTimeZone() throws SQLException {
+    void shouldFilterBasedOnSystemTimeZone(AuditLogDaoStoreFactory storeFactory) {
+      //01.01.2024 23:00:00.001 UTC
+      createTimeZoneDependentEntries(1704150000001L, "one ms too late", storeFactory);
       //01.01.2024 23:00:00 UTC
-      createTimeZoneDependentEntries(1704150000000L, "Too late");
-      //01.01.2024 22:59:59 UTC
-      createTimeZoneDependentEntries(1704149999000L, "within upper limit");
+      createTimeZoneDependentEntries(1704150000000L, "within upper limit", storeFactory);
+      //01.01.2024 12:00:00 UTC
+      createTimeZoneDependentEntries(1704110400000L, "somewhere in the middle", storeFactory);
       //31.12.2023 23:00:00 UTC
-      createTimeZoneDependentEntries(1704063600000L, "within lower limit");
-      //31.12.2023 22:59:59 UTC
-      createTimeZoneDependentEntries(1704063599000L, "Too soon");
+      createTimeZoneDependentEntries(1704063600000L, "within lower limit", storeFactory);
+      //31.12.2023 22:59:59.999 UTC
+      createTimeZoneDependentEntries(1704063599999L, "one ms too early", storeFactory);
 
-      AuditLogFilterContext filter = new AuditLogFilterContext();
-      filter.setFrom(Date.valueOf("2024-01-01"));
-      filter.setTo(Date.valueOf("2024-01-02"));
+      AuditLogFilterContext filter =
+        new AuditLogFilterContext(
+          1,
+          100,
+          null,
+          null,
+          "2024-01-01",
+          "2024-01-01",
+          null,
+          null,
+          TimeZone.getTimeZone("ECT").toZoneId()
+        );
       Collection<LogEntry> entries = service.getEntries(filter);
 
-      assertThat(entries).hasSize(2);
-      assertThat(entries.stream().map(LogEntry::getEntity)).containsOnly("within upper limit", "within lower limit");
+      assertThat(entries.stream().map(LogEntry::getEntity))
+        .containsOnly("within upper limit", "somewhere in the middle", "within lower limit");
     }
   }
 
-  private void createTimeZoneDependentEntries(long timestamp, String entity) throws SQLException {
-    PreparedStatement statement = connection.prepareStatement("INSERT INTO AUDITLOG(TIMESTAMP_, ENTITY, USERNAME, ACTION_, ENTRY) VALUES (?, ?, ?, ?, ?)");
-    //01.01.2024 23:00 UTC
-    statement.setTimestamp(1, new Timestamp(timestamp));
-    statement.setString(2, entity);
-    statement.setString(3, "user");
-    statement.setString(4, "created");
-    statement.setString(5, "Diff");
-    statement.executeUpdate();
+  private void createTimeZoneDependentEntries(long timestamp, String entity, AuditLogDaoStoreFactory storeFactory) {
+    AuditLogDao dao = new AuditLogDao();
+    dao.setTimestamp(Instant.ofEpochMilli(timestamp));
+    dao.setEntityName(entity);
+    dao.setUsername("user");
+    dao.setAction("created");
+    dao.setEntry("Diff");
+    storeFactory.getMutable().put(dao);
   }
 
   private void prepareDbEntries() {

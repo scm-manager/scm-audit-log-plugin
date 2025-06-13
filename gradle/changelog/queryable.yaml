@@ -1,0 +1,2 @@
+- type: changed
+  description: Migrated the changelog from a separate h2 data base to a queryable store.
