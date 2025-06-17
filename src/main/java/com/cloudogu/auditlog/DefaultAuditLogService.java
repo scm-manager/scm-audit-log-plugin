@@ -91,35 +91,39 @@ public class DefaultAuditLogService implements AuditLogService {
   @VisibleForTesting
   @SuppressWarnings("unchecked")
   List<LogEntry> getLogEntries(AuditLogFilterContext filterContext) {
-    QueryableStore<AuditLogDao> daoQueryableStore = daoStoreFactory.get();
-    Condition<AuditLogDao>[] filters = resolveAppliedQueryFilters(filterContext);
-    return daoQueryableStore.query(filters)
-      .orderBy(AuditLogDaoQueryFields.INTERNAL_ID, QueryableStore.Order.DESC)
-      .findAll((long) (filterContext.getPageNumber() - 1) * filterContext.getLimit(), filterContext.getLimit())
-      .stream()
-      .map(dao -> new LogEntry(
-        dao.getTimestamp(),
-        dao.getEntityName(),
-        dao.getUsername(),
-        dao.getAction(),
-        dao.getEntry()
-      ))
-      .toList();
+    try (QueryableMutableStore<AuditLogDao> daoQueryableStore = daoStoreFactory.getMutable()) {
+      Condition<AuditLogDao>[] filters = resolveAppliedQueryFilters(filterContext);
+      return daoQueryableStore.query(filters)
+        .orderBy(AuditLogDaoQueryFields.INTERNAL_ID, QueryableStore.Order.DESC)
+        .findAll((long) (filterContext.getPageNumber() - 1) * filterContext.getLimit(), filterContext.getLimit())
+        .stream()
+        .map(dao -> new LogEntry(
+          dao.getTimestamp(),
+          dao.getEntityName(),
+          dao.getUsername(),
+          dao.getAction(),
+          dao.getEntry()
+        ))
+        .toList();
+    }
   }
 
   @Override
   public int getTotalEntries(AuditLogFilterContext filterContext) {
     PermissionChecker.checkReadAuditLog();
 
-    QueryableStore<AuditLogDao> daoQueryableStore = daoStoreFactory.get();
-    return (int) daoQueryableStore.query(
-      resolveAppliedQueryFilters(filterContext)
-    ).count();
+    try (QueryableMutableStore<AuditLogDao> daoQueryableStore = daoStoreFactory.getMutable()) {
+      return (int) daoQueryableStore.query(
+        resolveAppliedQueryFilters(filterContext)
+      ).count();
+    }
   }
 
   @Override
   public Set<String> getLabels() {
-    return labelDaoStoreFactory.getMutable().getAll().keySet();
+    try (QueryableMutableStore<LabelDao> store = labelDaoStoreFactory.getMutable()) {
+      return store.getAll().keySet();
+    }
   }
 
   private static String getUsername() {
