@@ -29,6 +29,7 @@ import sonia.scm.auditlog.AuditEntry;
 import sonia.scm.auditlog.AuditLogEntity;
 import sonia.scm.auditlog.EntryCreationContext;
 import sonia.scm.repository.Repository;
+import sonia.scm.store.QueryableMutableStore;
 import sonia.scm.store.QueryableStoreExtension;
 
 import java.time.Instant;
@@ -383,7 +384,9 @@ class DefaultAuditLogServiceTest {
     dao.setUsername("user");
     dao.setAction("created");
     dao.setEntry("Diff");
-    storeFactory.getMutable().put(dao);
+    try (QueryableMutableStore<AuditLogDao> store = storeFactory.getMutable()) {
+      store.put(dao);
+    }
   }
 
   private void prepareDbEntries() {

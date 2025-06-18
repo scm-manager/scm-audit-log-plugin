@@ -24,6 +24,7 @@ import sonia.scm.migration.UpdateException;
 import sonia.scm.migration.UpdateStep;
 import sonia.scm.plugin.Extension;
 import sonia.scm.store.QueryableMutableStore;
+import sonia.scm.store.QueryableStore;
 import sonia.scm.util.IOUtil;
 import sonia.scm.version.Version;
 
@@ -58,13 +59,13 @@ public class H2ToQueryableUpdateStep implements UpdateStep {
   H2ToQueryableUpdateStep(String h2DbPath,
                           AuditLogDaoStoreFactory auditLogDaoStoreFactory,
                           LabelDaoStoreFactory labelDaoStoreFactory) {
-    this.labelDaoStoreFactory = labelDaoStoreFactory;
     if (new File(h2DbPath).exists() && new File(h2DbPath).isDirectory()) {
       this.h2DbPath = h2DbPath;
     } else {
       this.h2DbPath = null;
     }
     this.auditLogDaoStoreFactory = auditLogDaoStoreFactory;
+    this.labelDaoStoreFactory = labelDaoStoreFactory;
   }
 
   @Override
@@ -89,38 +90,42 @@ public class H2ToQueryableUpdateStep implements UpdateStep {
     ResultSet resultSet = statement.executeQuery("SELECT COUNT(*) FROM AUDITLOG");
     resultSet.next();
     long oldCount = resultSet.getLong(1);
-    long newCount = auditLogDaoStoreFactory.get().query().count();
-    if (oldCount != newCount) {
-      throw new UpdateException(
-        String.format("Expected to migrate %d audit log entries, but found %d in the new queryable store.", oldCount, newCount)
-      );
-    } else {
-      log.info("Successfully migrated {} audit log entries from H2 database to queryable store.", oldCount);
+    try (QueryableStore<AuditLogDao> store = auditLogDaoStoreFactory.get()) {
+      long newCount = store.query().count();
+      if (oldCount != newCount) {
+        throw new UpdateException(
+          String.format("Expected to migrate %d audit log entries, but found %d in the new queryable store.", oldCount, newCount)
+        );
+      } else {
+        log.info("Successfully migrated {} audit log entries from H2 database to queryable store.", oldCount);
+      }
     }
   }
 
   private void writeLabels() {
-    QueryableMutableStore<LabelDao> labelDaoStore = labelDaoStoreFactory.getMutable();
-    foundLabels.forEach(
-      label -> labelDaoStore.put(label, new LabelDao())
-    );
+    try (QueryableMutableStore<LabelDao> labelDaoStore = labelDaoStoreFactory.getMutable()) {
+      foundLabels.forEach(
+        label -> labelDaoStore.put(label, new LabelDao())
+      );
+    }
   }
 
   private void migrateLogEntries(Statement statement) throws SQLException {
-    QueryableMutableStore<AuditLogDao> auditLogDaoStore = auditLogDaoStoreFactory.getMutable();
-    ResultSet resultSet = statement.executeQuery(createEntriesQuery());
-    auditLogDaoStore.transactional(() -> {
-      try {
-        while (resultSet.next()) {
-          AuditLogDao auditLogDao = readLogEntry(resultSet);
-          foundLabels.addAll(auditLogDao.getLabels());
-          auditLogDaoStore.put(auditLogDao);
+    try (QueryableMutableStore<AuditLogDao> auditLogDaoStore = auditLogDaoStoreFactory.getMutable()) {
+      ResultSet resultSet = statement.executeQuery(createEntriesQuery());
+      auditLogDaoStore.transactional(() -> {
+        try {
+          while (resultSet.next()) {
+            AuditLogDao auditLogDao = readLogEntry(resultSet);
+            foundLabels.addAll(auditLogDao.getLabels());
+            auditLogDaoStore.put(auditLogDao);
+          }
+        } catch (SQLException e) {
+          throw new UpdateException("Failed to migrate audit log entries from H2 database", e);
         }
-      } catch (SQLException e) {
-        throw new UpdateException("Failed to migrate audit log entries from H2 database", e);
-      }
-      return true;
-    });
+        return true;
+      });
+    }
   }
 
   private AuditLogDao readLogEntry(ResultSet resultSet) throws SQLException {

@@ -61,18 +61,21 @@ class H2ToQueryableUpdateStepTest {
 
       updateStep.doUpdate();
 
-      QueryableMutableStore<AuditLogDao> store = auditLogDaoStoreFactory.getMutable();
-      Map<String, AuditLogDao> logs = store.getAll();
-      assertThat(logs.keySet()).containsExactly("1", "2", "3");
+      try (QueryableMutableStore<AuditLogDao> auditStore = auditLogDaoStoreFactory.getMutable()) {
+        Map<String, AuditLogDao> logs = auditStore.getAll();
+        assertThat(logs.keySet()).containsExactly("1", "2", "3");
 
-      AuditLogDao firstLog = logs.get("1");
-      assertThat(firstLog.getAction()).isEqualTo("created");
-      assertThat(firstLog.getEntry()).contains("'First Git repository'");
-      assertThat(firstLog.getUsername()).isEqualTo("scmadmin");
-      assertThat(firstLog.getLabels()).containsExactly("repository");
-      assertThat(firstLog.getEntityName()).isEqualTo("scmadmin/hog");
-      assertThat(labelDaoStoreFactory.getMutable().getAll().keySet())
-        .containsExactly("git", "repository", "config");
+        AuditLogDao firstLog = logs.get("1");
+        assertThat(firstLog.getAction()).isEqualTo("created");
+        assertThat(firstLog.getEntry()).contains("'First Git repository'");
+        assertThat(firstLog.getUsername()).isEqualTo("scmadmin");
+        assertThat(firstLog.getLabels()).containsExactly("repository");
+        assertThat(firstLog.getEntityName()).isEqualTo("scmadmin/hog");
+        try (QueryableMutableStore<LabelDao> labelStore = labelDaoStoreFactory.getMutable();) {
+          assertThat(labelStore.getAll().keySet())
+            .containsExactly("git", "repository", "config");
+        }
+      }
     }
 
     @Test
@@ -89,8 +92,10 @@ class H2ToQueryableUpdateStepTest {
     }
 
     @Test
-    void shouldFailIfCountOfLogsDiffer(AuditLogDaoStoreFactory auditLogDaoStoreFactory, LabelDaoStoreFactory labelDaoStoreFactory) throws Exception {
-      auditLogDaoStoreFactory.getMutable().put(new AuditLogDao());
+    void shouldFailIfCountOfLogsDiffer(AuditLogDaoStoreFactory auditLogDaoStoreFactory, LabelDaoStoreFactory labelDaoStoreFactory) {
+      try (QueryableMutableStore<AuditLogDao> store = auditLogDaoStoreFactory.getMutable()) {
+        store.put(new AuditLogDao());
+      }
 
       H2ToQueryableUpdateStep updateStep = new H2ToQueryableUpdateStep(
         temp.getPath(),
@@ -117,7 +122,11 @@ class H2ToQueryableUpdateStepTest {
 
     updateStep.doUpdate();
 
-    assertThat(auditLogDaoStoreFactory.getMutable().getAll()).isEmpty();
-    assertThat(labelDaoStoreFactory.getMutable().getAll()).isEmpty();
+    try (QueryableMutableStore<AuditLogDao> store = auditLogDaoStoreFactory.getMutable()) {
+      assertThat(store.getAll()).isEmpty();
+    }
+    try (QueryableMutableStore<LabelDao> store = labelDaoStoreFactory.getMutable()) {
+      assertThat(store.getAll()).isEmpty();
+    }
   }
 }
