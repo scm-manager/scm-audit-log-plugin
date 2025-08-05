@@ -25,7 +25,7 @@ dependencies {
 }
 
 scmPlugin {
-  scmVersion = "3.8.1-SNAPSHOT"
+  scmVersion = "3.9.0"
   displayName = "Audit Log"
   description = "Logs various actions on your server"
   author = "Cloudogu GmbH"
