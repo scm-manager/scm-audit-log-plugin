@@ -1,23 +1,23 @@
 {
   "scm-audit-log-plugin": {
-    "title": "Audit Log",
-    "navLink": "Audit Log",
+    "title": "Audit-Log",
+    "navLink": "Audit-Log",
     "repository": {
-      "key": "Audit Log",
+      "key": "Audit-Log",
       "link": "Für Repository öffnen"
     },
     "user": {
-      "key": "Audit Log",
+      "key": "Audit-Log",
       "link": "Für Benutzer öffnen"
     },
     "group": {
-      "key": "Audit Log",
+      "key": "Audit-Log",
       "link": "Für Gruppe öffnen"
     },
     "filter": {
       "entity": {
         "label": "Name",
-        "helpText": "Name des veränderten Objekts, z.B. Name eines Repositories oder Name einer Gruppe. Dieser Filter ist unabhängig von Groß- und Kleinschreibung. Sie können das '*'-Symbol als Wildcard nutzen, um z.B. durch 'namespace/*' alle Repositories in einem 'namespace' genannten Namespace zu selektieren oder mit '*admin' alle Objekte, deren Name auf 'admin' enden."
+        "helpText": "Name des veränderten Objekts, z.B. Name eines Repositorys oder Name einer Gruppe. Dieser Filter ist unabhängig von Groß- und Kleinschreibung. Sie können das '*'-Symbol als Wildcard nutzen, um z.B. durch 'namespace/*' alle Repositories in einem 'namespace' genannten Namespace zu selektieren, oder mit '*admin' alle Objekte, deren Name auf 'admin' enden."
       },
       "username": {
         "label": "Benutzername",
@@ -43,13 +43,13 @@
       "resetButton": "Filter zurücksetzen",
       "exportButton": "Als CSV exportieren"
     },
-    "auditLogWithPage": "Audit Log Seite {{page}} von {{total}}"
+    "auditLogWithPage": "Audit-Log-Seite {{page}} von {{total}}"
   },
   "permissions": {
     "auditLog": {
       "read": {
-        "displayName": "Audit Log lesen",
-        "description": "Darf das Audit Log lesen"
+        "displayName": "Audit-Log lesen",
+        "description": "Darf das Audit-Log lesen"
       }
     }
   }

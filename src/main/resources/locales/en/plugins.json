@@ -17,7 +17,7 @@
     "filter": {
       "entity": {
         "label": "Name",
-        "helpText": "Name of the changed object, e.g. name of a repository or name of a group. This filter is case-insensitive. You may use the '*' as a wildcard, e.g. to select all repositories from a namespace called 'namespace' with 'namespace/*' or '*admin' to select all objects that end on 'admin'. "
+        "helpText": "Name of the changed object, e.g. name of a repository or name of a group. This filter is case-insensitive. You may use the '*' as a wildcard, e.g. to select all repositories from a namespace called 'namespace' with 'namespace/*', or '*admin' to select all objects that end on 'admin'. "
       },
       "username": {
         "label": "Username",
