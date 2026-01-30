@@ -19,9 +19,9 @@ plugins {
 }
 
 dependencies {
-  implementation 'com.h2database:h2:2.1.214'
-  implementation 'org.javers:javers-core:6.7.1'
-  implementation 'org.apache.commons:commons-csv:1.10.0'
+  implementation 'com.h2database:h2:2.4.240'
+  implementation 'org.javers:javers-core:7.10.0'
+  implementation 'org.apache.commons:commons-csv:1.14.1'
 }
 
 scmPlugin {
