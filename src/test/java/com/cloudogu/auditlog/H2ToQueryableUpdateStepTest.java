@@ -92,7 +92,32 @@ class H2ToQueryableUpdateStepTest {
     }
 
     @Test
-    void shouldFailIfCountOfLogsDiffer(AuditLogDaoStoreFactory auditLogDaoStoreFactory, LabelDaoStoreFactory labelDaoStoreFactory) {
+    void shouldFailIfCountOfLogsDiffer(AuditLogDaoStoreFactory auditLogDaoStoreFactory, LabelDaoStoreFactory labelDaoStoreFactory) throws Exception {
+      try (QueryableMutableStore<AuditLogDao> store = auditLogDaoStoreFactory.getMutable()) {
+        store.put(new AuditLogDao());
+      }
+
+      H2ToQueryableUpdateStep updateStep = new H2ToQueryableUpdateStep(
+        temp.getPath(),
+        auditLogDaoStoreFactory,
+        labelDaoStoreFactory
+      ) {
+        @Override
+        void clearExistingData(QueryableMutableStore<AuditLogDao> auditLogDaoStore) {
+          // skip cleanup for this test
+        }
+      };
+
+      Assertions.assertThrows(
+        UpdateException.class,
+        updateStep::doUpdate
+      );
+
+      assertThat(temp).isNotEmptyDirectory();
+    }
+
+    @Test
+    void shouldRemoveExistingDataFirst(AuditLogDaoStoreFactory auditLogDaoStoreFactory, LabelDaoStoreFactory labelDaoStoreFactory) throws Exception {
       try (QueryableMutableStore<AuditLogDao> store = auditLogDaoStoreFactory.getMutable()) {
         store.put(new AuditLogDao());
       }
@@ -103,12 +128,9 @@ class H2ToQueryableUpdateStepTest {
         labelDaoStoreFactory
       );
 
-      Assertions.assertThrows(
-        UpdateException.class,
-        updateStep::doUpdate
-      );
+      updateStep.doUpdate();
 
-      assertThat(temp).isNotEmptyDirectory();
+      assertThat(temp).doesNotExist();
     }
   }
 

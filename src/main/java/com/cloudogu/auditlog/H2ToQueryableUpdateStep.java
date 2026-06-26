@@ -16,6 +16,7 @@
 
 package com.cloudogu.auditlog;
 
+import com.google.common.annotations.VisibleForTesting;
 import jakarta.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import org.h2.jdbcx.JdbcConnectionPool;
@@ -38,6 +39,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Extension
 @Slf4j
@@ -111,21 +113,47 @@ public class H2ToQueryableUpdateStep implements UpdateStep {
   }
 
   private void migrateLogEntries(Statement statement) throws SQLException {
+    log.debug("creating index on old audit log database");
+    statement.execute("create index on LABELS (audit);");
+    log.debug("index on old audit log database created; reading data");
+    ResultSet resultSet = statement.executeQuery(createEntriesQuery());
+
+    log.debug("writing data to new database");
     try (QueryableMutableStore<AuditLogDao> auditLogDaoStore = auditLogDaoStoreFactory.getMutable()) {
-      ResultSet resultSet = statement.executeQuery(createEntriesQuery());
-      auditLogDaoStore.transactional(() -> {
-        try {
-          while (resultSet.next()) {
-            AuditLogDao auditLogDao = readLogEntry(resultSet);
-            foundLabels.addAll(auditLogDao.getLabels());
-            auditLogDaoStore.put(auditLogDao);
+      clearExistingData(auditLogDaoStore);
+      int batchSize = 5000;
+      AtomicBoolean hasMoreRecords = new AtomicBoolean(true);
+
+      while (hasMoreRecords.get()) {
+        auditLogDaoStore.transactional(() -> {
+          try {
+            int count = 0;
+            while (count < batchSize) {
+              // If there are no more entries in the ResultSet, signal the outer loop to stop
+              if (!resultSet.next()) {
+                hasMoreRecords.set(false);
+                log.debug("finished writing data to new database");
+                return true;
+              }
+
+              AuditLogDao auditLogDao = readLogEntry(resultSet);
+              foundLabels.addAll(auditLogDao.getLabels());
+              auditLogDaoStore.put(auditLogDao);
+              count++;
+            }
+          } catch (SQLException e) {
+            throw new UpdateException("Failed to migrate audit log entries from H2 database", e);
           }
-        } catch (SQLException e) {
-          throw new UpdateException("Failed to migrate audit log entries from H2 database", e);
-        }
-        return true;
-      });
+          log.debug("wrote batch of {} entries to new database", batchSize);
+          return true;
+        });
+      }
     }
+  }
+
+  @VisibleForTesting
+  void clearExistingData(QueryableMutableStore<AuditLogDao> auditLogDaoStore) {
+    auditLogDaoStore.clear();
   }
 
   private AuditLogDao readLogEntry(ResultSet resultSet) throws SQLException {
