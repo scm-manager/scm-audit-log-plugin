@@ -15,27 +15,18 @@
  */
 
 import React, { FC } from "react";
-import { SecondaryNavigationItem } from "@scm-manager/ui-components";
 import { useTranslation } from "react-i18next";
-import { useRouteMatch } from "react-router-dom";
+import { SecondaryNavigationItem } from "@scm-manager/ui-components";
 
 const AuditLogNavigation: FC = () => {
   const [t] = useTranslation("plugins");
-  const match = useRouteMatch();
-
-  const matchesAuditLog = (route: any) => {
-    const regex = /\/admin\/audit-log\/.+/;
-    return !!route.location.pathname.match(regex);
-  };
 
   return (
     <SecondaryNavigationItem
-      to={match.url + "/audit-log/"}
+      to={"/admin/audit-log"}
       icon="fas fa-book-open"
       label={t("scm-audit-log-plugin.navLink")}
       title={t("scm-audit-log-plugin.navLink")}
-      activeWhenMatch={matchesAuditLog}
-      activeOnlyWhenExact={false}
     />
   );
 };

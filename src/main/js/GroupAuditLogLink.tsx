@@ -14,11 +14,11 @@
  * along with this program. If not, see https://www.gnu.org/licenses/.
  */
 
-import { Group } from "@scm-manager/ui-types";
 import React, { FC } from "react";
 import { useTranslation } from "react-i18next";
 import { useIndex } from "@scm-manager/ui-api";
 import { urls } from "@scm-manager/ui-components";
+import { Group } from "@scm-manager/ui-types";
 
 type Props = {
   group: Group;

@@ -14,10 +14,10 @@
  * along with this program. If not, see https://www.gnu.org/licenses/.
  */
 
-import { apiClient } from "@scm-manager/ui-components";
-import { useQuery } from "react-query";
 import { ApiResult, useRequiredIndexLink } from "@scm-manager/ui-api";
+import { apiClient } from "@scm-manager/ui-components";
 import { HalRepresentationWithEmbedded } from "@scm-manager/ui-types";
+import { useQuery } from "@tanstack/react-query";
 
 type AuditLogEntry = {
   timestamp: Date;
@@ -47,14 +47,16 @@ export type Filters = {
 
 export const useAuditLog = (pageNumber: number, filters: Filters): ApiResult<AuditLog> => {
   const indexLink = useRequiredIndexLink("auditLog");
-  return useQuery<AuditLog, Error>(["auditLog", pageNumber, filters], () =>
-    apiClient
-      .get(
-        Object.entries(filters).reduce(
-          (link, [filterKey, filterValue]) => (filterValue ? `${link}&${filterKey}=${filterValue}` : link),
-          indexLink + `?pageNumber=${pageNumber}`
+  return useQuery<AuditLog, Error>({
+    queryKey: ["auditLog", pageNumber, filters],
+    queryFn: () =>
+      apiClient
+        .get(
+          Object.entries(filters).reduce(
+            (link, [filterKey, filterValue]) => (filterValue ? `${link}&${filterKey}=${filterValue}` : link),
+            indexLink + `?pageNumber=${pageNumber}`,
+          ),
         )
-      )
-      .then(response => response.json())
-  );
+        .then((response) => response.json()),
+  });
 };

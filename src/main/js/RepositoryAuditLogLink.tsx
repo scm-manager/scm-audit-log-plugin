@@ -14,11 +14,11 @@
  * along with this program. If not, see https://www.gnu.org/licenses/.
  */
 
-import { Repository } from "@scm-manager/ui-types";
 import React, { FC } from "react";
 import { useTranslation } from "react-i18next";
 import { useIndex } from "@scm-manager/ui-api";
 import { urls } from "@scm-manager/ui-components";
+import { Repository } from "@scm-manager/ui-types";
 
 type Props = {
   repository: Repository;
@@ -35,7 +35,12 @@ const RepositoryAuditLogLink: FC<Props> = ({ repository }) => {
     <tr>
       <th>{t("scm-audit-log-plugin.repository.key")}</th>
       <td>
-        <a href={urls.withContextPath("/admin/audit-log/1?label=repository&entity=") + `${repository.namespace}/${repository.name}`}>
+        <a
+          href={
+            urls.withContextPath("/admin/audit-log/1?label=repository&entity=") +
+            `${repository.namespace}/${repository.name}`
+          }
+        >
           {t("scm-audit-log-plugin.repository.link")}
         </a>
       </td>

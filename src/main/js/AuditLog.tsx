@@ -16,13 +16,13 @@
 
 import React, { FC, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ErrorNotification, Level, LinkPaginator, Loading, Title, urls } from "@scm-manager/ui-components";
-import { useDocumentTitle } from "@scm-manager/ui-core";
-import { Filters, useAuditLog } from "./useAuditLog";
-import { Redirect, useLocation, useRouteMatch } from "react-router-dom";
-import { Link, Links } from "@scm-manager/ui-types";
+import { Navigate, useLocation, useMatch } from "react-router-dom";
 import queryString from "query-string";
-import { Form } from "@scm-manager/ui-forms";
+import { LinkPaginator, Loading, urls } from "@scm-manager/ui-components";
+import { ErrorNotification, Form, Level, Title, useDocumentTitle } from "@scm-manager/ui-core";
+import { Link, Links } from "@scm-manager/ui-types";
+import { Filters, useAuditLog } from "./useAuditLog";
+import { useIndexLinks } from "@scm-manager/ui-api";
 
 const ExportButton: FC<{ links: Links; filters: Filters }> = ({ links, filters }) => {
   const [t] = useTranslation("plugins");
@@ -30,11 +30,7 @@ const ExportButton: FC<{ links: Links; filters: Filters }> = ({ links, filters }
     let link = (links.auditLogCsvExport as Link).href;
     for (const filter of Object.entries(filters)) {
       if (filter[1]) {
-        if (!link.includes("?")) {
-          link += "?";
-        } else {
-          link += "&";
-        }
+        link += link.includes("?") ? "&" : "?";
         link += `${filter[0]}=${filter[1]}`;
       }
     }
@@ -47,10 +43,11 @@ const ExportButton: FC<{ links: Links; filters: Filters }> = ({ links, filters }
   return null;
 };
 
-const AuditLog: FC<{ links: Links }> = ({ links }) => {
-  const match = useRouteMatch();
+const AuditLog: FC = () => {
+  const match = useMatch("/admin/audit-log/*");
   const page = urls.getPageFromMatch(match);
   const location = useLocation();
+  const links = useIndexLinks();
   const searchParams = queryString.parse(location.search) as {
     entity?: string;
     username?: string;
@@ -63,7 +60,7 @@ const AuditLog: FC<{ links: Links }> = ({ links }) => {
     label: searchParams.label || "",
     action: searchParams.action || "",
     from: "",
-    to: ""
+    to: "",
   });
   const { data, error, isLoading } = useAuditLog(page, filters);
   const [t] = useTranslation("plugins");
@@ -84,9 +81,9 @@ const AuditLog: FC<{ links: Links }> = ({ links }) => {
         <Form.Input name="entity" />
         <Form.Select
           name="label"
-          options={(["", ...(data?._embedded?.labels as { labels: string[] })?.labels] || []).map(label => ({
+          options={["", ...((data?._embedded?.labels as { labels: string[] })?.labels || [])].map((label) => ({
             label,
-            value: label
+            value: label,
           }))}
         />
         <Form.Input name="username" />
@@ -94,9 +91,9 @@ const AuditLog: FC<{ links: Links }> = ({ links }) => {
       <Form.Row>
         <Form.Select
           name="action"
-          options={["", "created", "modified", "deleted"].map(label => ({
+          options={["", "created", "modified", "deleted"].map((label) => ({
             label,
-            value: label
+            value: label,
           }))}
         />
         <Form.Input name="from" type="date" />
@@ -110,12 +107,11 @@ const AuditLog: FC<{ links: Links }> = ({ links }) => {
   }
 
   if (isLoading || !data) {
-    // @ts-ignore annoying....
     return <Loading />;
   }
 
   if (data && data.pageTotal < page && page > 1) {
-    return <Redirect to={`/admin/audit-log/${data.pageTotal}`} />;
+    return <Navigate to={`/admin/audit-log/${data.pageTotal}`} />;
   }
 
   return (
@@ -124,9 +120,9 @@ const AuditLog: FC<{ links: Links }> = ({ links }) => {
       {filterForm}
       <hr />
       <Level right={<ExportButton links={links} filters={filters} />} />
-      <pre>{data?._embedded?.entries.map(e => e.entry + "\n")}</pre>
+      <pre>{data?._embedded?.entries.map((e) => e.entry + "\n")}</pre>
       <hr />
-      <LinkPaginator collection={data} page={page} />
+      <LinkPaginator baseUrl="/admin/audit-log/" collection={data} page={page} />
     </>
   );
 };
